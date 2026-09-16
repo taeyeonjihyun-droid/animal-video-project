@@ -1,0 +1,63 @@
+{
+  "project_title": "동물 친구들의 시골 여행",
+  "subtitle": "강아지 · 고양이 · 팬더 · 토끼의 1분 이야기",
+  "video": {
+    "width": 1280,
+    "height": 720,
+    "fps": 30,
+    "fade_seconds": 0.35,
+    "bgm_volume": 0.16
+  },
+  "bgm": "assets/audio/bgm.mp3",
+  "output": "output/animal_trip.mp4",
+  "scenes": [
+    {
+      "source": "assets/images/01_departure.jpg",
+      "caption": "여행 출발! 오늘은 시골로 떠나요",
+      "duration": 7.5,
+      "zoom": 1.04
+    },
+    {
+      "source": "assets/images/02_country_road.jpg",
+      "caption": "강아지와 고양이, 팬더와 토끼가 시골길을 걸어요",
+      "duration": 7.5,
+      "zoom": 1.04
+    },
+    {
+      "source": "assets/images/03_field.jpg",
+      "caption": "넓은 들판에서 신나게 뛰어놀아요",
+      "duration": 7.5,
+      "zoom": 1.05
+    },
+    {
+      "source": "assets/images/04_house.jpg",
+      "caption": "드디어 아늑한 시골집에 도착했어요",
+      "duration": 7.5,
+      "zoom": 1.04
+    },
+    {
+      "source": "assets/images/05_snack.jpg",
+      "caption": "마당에 둘러앉아 맛있는 간식 시간을 가져요",
+      "duration": 7.5,
+      "zoom": 1.04
+    },
+    {
+      "source": "assets/images/06_play.jpg",
+      "caption": "네 동물 친구들이 함께 즐겁게 놀아요",
+      "duration": 7.5,
+      "zoom": 1.05
+    },
+    {
+      "source": "assets/images/07_evening.jpg",
+      "caption": "노을이 지는 길을 천천히 산책해요",
+      "duration": 7.5,
+      "zoom": 1.04
+    },
+    {
+      "source": "assets/images/08_sunset.jpg",
+      "caption": "행복했던 시골 여행, 다음에 또 만나요",
+      "duration": 7.5,
+      "zoom": 1.03
+    }
+  ]
+}
