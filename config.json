@@ -1,6 +1,6 @@
 {
-  "project_title": "동물 친구들의 시골 여행",
-  "subtitle": "강아지 · 고양이 · 팬더 · 토끼의 1분 이야기",
+  "project_title": "동물 친구들의 별빛 캠핑",
+  "subtitle": "강아지 · 고양이 · 팬더 · 토끼의 1분 캠핑 이야기",
   "video": {
     "width": 1280,
     "height": 720,
@@ -12,50 +12,50 @@
   "output": "output/animal_trip.mp4",
   "scenes": [
     {
-      "source": "assets/images/departure.png",
-      "caption": "여행 출발! 오늘은 시골로 떠나요",
+      "source": "assets/images/camp_departure.png",
+      "caption": "캠핑 출발! 오늘은 별빛 캠핑을 떠나요",
       "duration": 7.5,
       "zoom": 1.04
     },
     {
-      "source": "assets/images/country_road.png",
-      "caption": "강아지와 고양이, 팬더와 토끼가 시골길을 걸어요",
+      "source": "assets/images/forest_walk.png",
+      "caption": "강아지와 고양이, 팬더와 토끼가 숲길을 걸어요",
       "duration": 7.5,
       "zoom": 1.04
     },
     {
-      "source": "assets/images/field.png",
-      "caption": "넓은 들판에서 신나게 뛰어놀아요",
+      "source": "assets/images/tent_setup.png",
+      "caption": "모두 함께 힘을 모아 텐트를 설치해요",
       "duration": 7.5,
       "zoom": 1.05
     },
     {
-      "source": "assets/images/house.png",
-      "caption": "드디어 아늑한 시골집에 도착했어요",
+      "source": "assets/images/river_walk.png",
+      "caption": "시원한 강가를 천천히 산책해요",
       "duration": 7.5,
       "zoom": 1.04
     },
     {
-      "source": "assets/images/snack.png",
-      "caption": "마당에 둘러앉아 맛있는 간식 시간을 가져요",
+      "source": "assets/images/snack_time.png",
+      "caption": "캠핑 의자에 앉아 맛있는 간식을 먹어요",
       "duration": 7.5,
       "zoom": 1.04
     },
     {
-      "source": "assets/images/play.png",
-      "caption": "네 동물 친구들이 함께 즐겁게 놀아요",
+      "source": "assets/images/campfire.png",
+      "caption": "모닥불 앞에서 즐겁게 웃고 이야기해요",
       "duration": 7.5,
       "zoom": 1.05
     },
     {
-      "source": "assets/images/evening.png",
-      "caption": "노을이 지는 길을 천천히 산책해요",
+      "source": "assets/images/starry_night.png",
+      "caption": "밤하늘의 반짝이는 별을 함께 바라봐요",
       "duration": 7.5,
       "zoom": 1.04
     },
     {
-      "source": "assets/images/sunset.png",
-      "caption": "행복했던 시골 여행, 다음에 또 만나요",
+      "source": "assets/images/morning_goodbye.png",
+      "caption": "행복했던 캠핑 여행, 다음에 또 만나요",
       "duration": 7.5,
       "zoom": 1.03
     }
