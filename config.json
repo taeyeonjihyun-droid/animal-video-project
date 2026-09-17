@@ -1,1 +1,63 @@
-
+{
+  "project_title": "별빛 캠핑 여행",
+  "subtitle": "강아지 · 고양이 · 팬더 · 토끼의 캠핑 모험",
+  "video": {
+    "width": 1280,
+    "height": 720,
+    "fps": 30,
+    "fade_seconds": 0.35,
+    "bgm_volume": 0.16
+  },
+  "bgm": "assets/audio/bgm.mp3",
+  "output": "output/animal_trip.mp4",
+  "scenes": [
+    {
+      "source": "assets/clips/camp_departure.mp4",
+      "caption": "캠핑 여행 출발! 네 친구가 신나게 길을 나서요",
+      "duration": 7.5,
+      "zoom": 1.0
+    },
+    {
+      "source": "assets/clips/forest_walk.mp4",
+      "caption": "햇살 가득한 숲길을 함께 걸어요",
+      "duration": 7.5,
+      "zoom": 1.0
+    },
+    {
+      "source": "assets/clips/tent_setup.mp4",
+      "caption": "숲속 캠핑장에 도착해 텐트를 함께 세워요",
+      "duration": 7.5,
+      "zoom": 1.0
+    },
+    {
+      "source": "assets/clips/river_walk.mp4",
+      "caption": "맑은 강가를 따라 천천히 산책해요",
+      "duration": 7.5,
+      "zoom": 1.0
+    },
+    {
+      "source": "assets/clips/snack_time.mp4",
+      "caption": "맛있는 간식을 먹으며 즐거운 휴식을 가져요",
+      "duration": 7.5,
+      "zoom": 1.0
+    },
+    {
+      "source": "assets/clips/campfire.mp4",
+      "caption": "따뜻한 캠프파이어 앞에서 노래하고 웃어요",
+      "duration": 7.5,
+      "zoom": 1.0
+    },
+    {
+      "source": "assets/clips/starry_night.mp4",
+      "caption": "반짝이는 별빛 아래에서 아름다운 밤을 감상해요",
+      "duration": 7.5,
+      "zoom": 1.0
+    },
+    {
+      "source": "assets/clips/morning_goodbye.mp4",
+      "caption": "행복했던 캠핑 여행을 마치고 웃으며 인사해요",
+      "duration": 7.5,
+      "zoom": 1.0
+    }
+  ]
+}
