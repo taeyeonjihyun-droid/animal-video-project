@@ -1,6 +1,6 @@
 {
-  "project_title": "별빛 캠핑 여행",
-  "subtitle": "강아지 · 고양이 · 팬더 · 토끼의 캠핑 모험",
+  "project_title": "동물 친구들의 바닷가 보물찾기",
+  "subtitle": "강아지 · 고양이 · 팬더 · 토끼의 신나는 바다 모험",
   "video": {
     "width": 1280,
     "height": 720,
@@ -12,52 +12,52 @@
   "output": "output/animal_trip.mp4",
   "scenes": [
     {
-      "source": "assets/clips/camp_departure.mp4",
-      "caption": "캠핑 여행 출발! 네 친구가 신나게 길을 나서요",
+      "source": "assets/images/beach_arrival.png",
+      "caption": "와! 드디어 바닷가에 도착했어요!",
       "duration": 7.5,
-      "zoom": 1.0
+      "zoom": 1.04
     },
     {
-      "source": "assets/clips/forest_walk.mp4",
-      "caption": "햇살 가득한 숲길을 함께 걸어요",
+      "source": "assets/images/map_discovery.png",
+      "caption": "모래사장에서 신비한 보물지도를 찾았어요!",
       "duration": 7.5,
-      "zoom": 1.0
+      "zoom": 1.05
     },
     {
-      "source": "assets/clips/tent_setup.mp4",
-      "caption": "숲속 캠핑장에 도착해 텐트를 함께 세워요",
+      "source": "assets/images/treasure_hunt_start.png",
+      "caption": "네 친구가 보물지도를 따라 출발해요!",
       "duration": 7.5,
-      "zoom": 1.0
+      "zoom": 1.04
     },
     {
-      "source": "assets/clips/river_walk.mp4",
-      "caption": "맑은 강가를 따라 천천히 산책해요",
+      "source": "assets/images/shell_collecting.png",
+      "caption": "예쁜 조개와 반짝이는 돌도 찾았어요!",
       "duration": 7.5,
-      "zoom": 1.0
+      "zoom": 1.05
     },
     {
-      "source": "assets/clips/snack_time.mp4",
-      "caption": "맛있는 간식을 먹으며 즐거운 휴식을 가져요",
+      "source": "assets/images/cave_found.png",
+      "caption": "지도 끝에서 작은 동굴을 발견했어요!",
       "duration": 7.5,
-      "zoom": 1.0
+      "zoom": 1.04
     },
     {
-      "source": "assets/clips/campfire.mp4",
-      "caption": "따뜻한 캠프파이어 앞에서 노래하고 웃어요",
+      "source": "assets/images/treasure_box.png",
+      "caption": "드디어 모래 속 보물상자를 찾았어요!",
       "duration": 7.5,
-      "zoom": 1.0
+      "zoom": 1.05
     },
     {
-      "source": "assets/clips/starry_night.mp4",
-      "caption": "반짝이는 별빛 아래에서 아름다운 밤을 감상해요",
+      "source": "assets/images/sunset_treasure.png",
+      "caption": "노을 아래서 보물을 함께 열어봤어요!",
       "duration": 7.5,
-      "zoom": 1.0
+      "zoom": 1.04
     },
     {
-      "source": "assets/clips/morning_goodbye.mp4",
-      "caption": "행복했던 캠핑 여행을 마치고 웃으며 인사해요",
+      "source": "assets/images/beach_goodbye.png",
+      "caption": "즐거운 바닷가 보물찾기, 다음에 또 만나요!",
       "duration": 7.5,
-      "zoom": 1.0
+      "zoom": 1.03
     }
   ]
 }
