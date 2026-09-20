@@ -414,17 +414,20 @@ def build_video():
         # BGM이 있으면 전체 길이에 맞춰 반복 후 믹싱
         bgm_path = ROOT / cfg.get("bgm", "")
         if bgm_path.exists() and bgm_path.is_file():
-            bgm_source = AudioFileClip(str(bgm_path))
-            bgm = bgm_source.with_effects([
-                afx.AudioLoop(duration=final.duration),
-                afx.MultiplyVolume(float(vcfg.get("bgm_volume", 0.16))),
-                afx.AudioFadeIn(1.0),
-                afx.AudioFadeOut(1.5),
-            ])
-            if final.audio is not None:
-                final = final.with_audio(CompositeAudioClip([final.audio, bgm]))
-            else:
-                final = final.with_audio(bgm)
+            try:
+                bgm_source = AudioFileClip(str(bgm_path))
+                bgm = bgm_source.with_effects([
+                    afx.AudioLoop(duration=final.duration),
+                    afx.MultiplyVolume(float(vcfg.get("bgm_volume", 0.16))),
+                    afx.AudioFadeIn(1.0),
+                    afx.AudioFadeOut(1.5),
+                ])
+                if final.audio is not None:
+                    final = final.with_audio(CompositeAudioClip([final.audio, bgm]))
+                else:
+                    final = final.with_audio(bgm)
+            except (OSError, ValueError):
+                print(f"[안내] BGM 로드 실패: {bgm_path}. 무음 영상으로 생성합니다.")
         else:
             print(f"[안내] BGM 없음: {bgm_path}. 무음 영상으로 생성합니다.")
 

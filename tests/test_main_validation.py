@@ -1,7 +1,7 @@
 import unittest
 from PIL import Image, ImageDraw
 
-from main import validate_config, wrap_text, load_font
+from main import validate_config, wrap_text, load_font, caption_overlay, title_overlay
 
 
 class MainValidationTests(unittest.TestCase):
@@ -94,6 +94,12 @@ class MainValidationTests(unittest.TestCase):
         self.assertTrue(lines[-1].endswith("…"))
         last_width = draw.textbbox((0, 0), lines[-1], font=font, stroke_width=2)[2]
         self.assertLessEqual(last_width, max_width)
+
+    def test_overlay_handles_empty_text(self):
+        cap = caption_overlay("", (1080, 1920))
+        title = title_overlay("", "", (1080, 1920))
+        self.assertEqual(cap.shape, (1920, 1080, 4))
+        self.assertEqual(title.shape, (1920, 1080, 4))
 
 
 if __name__ == "__main__":
