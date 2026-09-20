@@ -122,7 +122,7 @@ class BatchFeatureTests(unittest.TestCase):
         self.assertEqual(mocked_build.call_count, 2)
         first_output = mocked_build.call_args_list[0].args[0]["output"]
         second_output = mocked_build.call_args_list[1].args[0]["output"]
-        self.assertEqual(first_output, "output/test_01.mp4")
+        self.assertEqual(first_output, "output/test.mp4")
         self.assertEqual(second_output, "output/test_02.mp4")
 
     def test_explicit_output_override_is_preserved(self):

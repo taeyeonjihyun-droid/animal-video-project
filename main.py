@@ -534,6 +534,7 @@ def build_batch_videos(batch_file_override: str | None = None) -> None:
 
     print(f"[배치 시작] {batch_path} / 총 {len(jobs)}개")
     total_jobs = len(jobs)
+    used_outputs: set[str] = set()
     for index, job in enumerate(jobs, start=1):
         if not isinstance(job, dict):
             raise ValueError(f"jobs[{index}]는 객체(dict)여야 합니다.")
@@ -556,8 +557,17 @@ def build_batch_videos(batch_file_override: str | None = None) -> None:
         if isinstance(overrides, dict) and overrides:
             cfg = deep_merge_dict(cfg, overrides)
         effective_output_value = str(cfg.get("output", "output/animal_trip.mp4"))
+        final_output_value = effective_output_value
         if total_jobs > 1 and not has_output_override and effective_output_value == base_output_value:
-            cfg["output"] = with_batch_index_suffix(effective_output_value, index)
+            if final_output_value in used_outputs:
+                suffix_index = index
+                candidate = with_batch_index_suffix(effective_output_value, suffix_index)
+                while candidate in used_outputs:
+                    suffix_index += 1
+                    candidate = with_batch_index_suffix(effective_output_value, suffix_index)
+                final_output_value = candidate
+        cfg["output"] = final_output_value
+        used_outputs.add(final_output_value)
 
         name = str(job.get("name", f"batch-{index:02d}"))
         print(f"[배치 작업 {index}/{len(jobs)}] {name} ({config_path})")
