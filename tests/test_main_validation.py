@@ -21,6 +21,22 @@ class MainValidationTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "duration은 0보다 커야 합니다"):
             validate_config(cfg)
 
+    def test_validate_config_rejects_non_numeric_video_values(self):
+        cfg = {
+            "video": {"width": "wide", "height": 1920, "fps": 30},
+            "scenes": [{"source": "assets/images/x.png", "duration": 4.0}],
+        }
+        with self.assertRaisesRegex(ValueError, "video.width, video.height, video.fps는 숫자여야 합니다"):
+            validate_config(cfg)
+
+    def test_validate_config_rejects_non_numeric_scene_values(self):
+        cfg = {
+            "video": {"width": 1080, "height": 1920, "fps": 30},
+            "scenes": [{"source": "assets/images/x.png", "duration": "fast", "zoom": 1.0}],
+        }
+        with self.assertRaisesRegex(ValueError, "duration은 숫자여야 합니다"):
+            validate_config(cfg)
+
     def test_wrap_text_handles_korean_without_spaces(self):
         image = Image.new("RGBA", (1080, 1920), (0, 0, 0, 0))
         draw = ImageDraw.Draw(image)

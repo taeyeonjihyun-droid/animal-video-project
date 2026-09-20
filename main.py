@@ -37,9 +37,12 @@ def validate_config(cfg: dict) -> None:
         raise ValueError("`scenes`가 비어 있습니다. 최소 1개 이상의 장면을 설정하세요.")
 
     vcfg = cfg["video"]
-    width = int(vcfg.get("width", 0))
-    height = int(vcfg.get("height", 0))
-    fps = int(vcfg.get("fps", 0))
+    try:
+        width = int(vcfg.get("width", 0))
+        height = int(vcfg.get("height", 0))
+        fps = int(vcfg.get("fps", 0))
+    except (TypeError, ValueError) as exc:
+        raise ValueError("video.width, video.height, video.fps는 숫자여야 합니다.") from exc
     if width <= 0 or height <= 0:
         raise ValueError("영상 크기(width/height)는 1 이상의 정수여야 합니다.")
     if fps <= 0:
@@ -51,10 +54,16 @@ def validate_config(cfg: dict) -> None:
         source = scene.get("source")
         if not source or not isinstance(source, str):
             raise ValueError(f"{i}번 장면에 `source`가 없습니다.")
-        duration = float(scene.get("duration", 0))
+        try:
+            duration = float(scene.get("duration", 0))
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"{i}번 장면 duration은 숫자여야 합니다.") from exc
         if duration <= 0:
             raise ValueError(f"{i}번 장면 duration은 0보다 커야 합니다.")
-        zoom = float(scene.get("zoom", 1.0))
+        try:
+            zoom = float(scene.get("zoom", 1.0))
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"{i}번 장면 zoom은 숫자여야 합니다.") from exc
         if zoom <= 0:
             raise ValueError(f"{i}번 장면 zoom은 0보다 커야 합니다.")
 
