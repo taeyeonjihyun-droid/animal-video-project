@@ -184,6 +184,7 @@ GitHub Actions에서 배치 실행:
 2. `run_mode`를 `batch`로 선택
 3. 필요하면 `batch_file` 입력값을 수정(예: `configs/batch_week1.json`)
 4. 완료 후 **Artifacts**에서 `rendered-animal-video` 다운로드
+5. 실패 시 run 요약 화면에 **배치 실패 원인 요약 로그**가 자동으로 출력되며, `batch-failure-log` 아티팩트로 원본 로그를 받을 수 있습니다.
 
 옵션:
 - `--batch-file`을 생략하면 기본값으로 `batch_config.json`을 사용합니다.

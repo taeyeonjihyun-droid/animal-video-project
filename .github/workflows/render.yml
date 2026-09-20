@@ -68,7 +68,39 @@ jobs:
 
       - name: Render batch videos
         if: ${{ env.RUN_MODE == 'batch' }}
-        run: python main.py --batch-render --batch-file "${{ github.event.inputs.batch_file }}"
+        shell: bash
+        run: |
+          set -o pipefail
+          python main.py --batch-render --batch-file "${{ github.event.inputs.batch_file }}" 2>&1 | tee output/batch_render.log
+
+      - name: Summarize batch failure reason
+        if: ${{ failure() && env.RUN_MODE == 'batch' }}
+        shell: bash
+        run: |
+          echo "배치 렌더링 실패 원인 요약"
+          echo "## 배치 렌더링 실패 원인 요약" >> "$GITHUB_STEP_SUMMARY"
+          if [ -f output/batch_render.log ]; then
+            summary_lines="$(grep -Ei 'traceback|error|exception|failed|valueerror|filenotfounderror' output/batch_render.log | tail -n 20 || true)"
+            if [ -z "$summary_lines" ]; then
+              summary_lines="$(tail -n 40 output/batch_render.log || true)"
+            fi
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "\`\`\`text" >> "$GITHUB_STEP_SUMMARY"
+            echo "$summary_lines" >> "$GITHUB_STEP_SUMMARY"
+            echo "\`\`\`" >> "$GITHUB_STEP_SUMMARY"
+            echo "$summary_lines"
+          else
+            echo "batch_render.log 파일이 없어 상세 로그를 찾지 못했습니다." | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload batch failure log
+        if: ${{ failure() && env.RUN_MODE == 'batch' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: batch-failure-log
+          path: output/batch_render.log
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: Check rendered videos
         if: ${{ env.RUN_MODE == 'render' || env.RUN_MODE == 'both' || env.RUN_MODE == 'batch' }}
