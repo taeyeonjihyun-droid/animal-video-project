@@ -22,10 +22,28 @@ def load_env_file(env_file: Path) -> None:
         if not line or line.startswith("#") or "=" not in line:
             continue
         key, value = line.split("=", 1)
-        value = value.strip()
-        if len(value) >= 2 and value[0] == value[-1] and value[0] in {'"', "'"}:
-            value = value[1:-1]
-        os.environ.setdefault(key.strip(), value)
+        os.environ.setdefault(key.strip(), parse_env_value(value))
+
+
+def parse_env_value(value: str) -> str:
+    value = value.strip()
+    if not value:
+        return ""
+    if value[0] in {'"', "'"}:
+        quote = value[0]
+        if len(value) >= 2 and value[-1] == quote:
+            inner = value[1:-1]
+            return bytes(inner, "utf-8").decode("unicode_escape")
+        return value
+
+    comment_index = None
+    for index, char in enumerate(value):
+        if char == "#" and index > 0 and value[index - 1].isspace():
+            comment_index = index
+            break
+    if comment_index is not None:
+        value = value[:comment_index]
+    return value.strip()
 
 
 def load_scene_spec(path: Path) -> dict[str, Any]:
@@ -305,9 +323,13 @@ class RunwayAdapter(ProviderAdapter):
         self.client_factory = client_factory or import_runway_client()
 
     def run(self, package: dict[str, Any], output_dir: Path) -> dict[str, Any]:
-        client = self.client_factory(api_key=self.api_key)
         ratio = resolve_runway_ratio(package)
         prompt_image = self.prompt_image.strip() if self.prompt_image else None
+        if self.generation_mode == "image_to_video" and not prompt_image:
+            raise ValueError(
+                "RUNWAY_PROMPT_IMAGE is required when RUNWAY_GENERATION_MODE=image_to_video."
+            )
+        client = self.client_factory(api_key=self.api_key)
         tasks = []
 
         write_json(output_dir / "scene_package.json", package)
@@ -321,10 +343,6 @@ class RunwayAdapter(ProviderAdapter):
                 "negative_prompt": shot["negative_prompt"],
             }
             if self.generation_mode == "image_to_video":
-                if not prompt_image:
-                    raise ValueError(
-                        "RUNWAY_PROMPT_IMAGE is required when RUNWAY_GENERATION_MODE=image_to_video."
-                    )
                 create_kwargs["prompt_image"] = prompt_image
                 try:
                     task = client.image_to_video.create(**create_kwargs)

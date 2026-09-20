@@ -14,6 +14,7 @@ from generate_video_workflow import (
     build_shot_prompt,
     decode_provider_response,
     load_scene_spec,
+    parse_env_value,
     parse_runway_duration,
     parse_timeout,
     resolve_runway_ratio,
@@ -178,6 +179,18 @@ class GenerateVideoWorkflowTests(unittest.TestCase):
     def test_resolve_runway_ratio_prefers_env_override(self):
         package = build_scene_package(self.spec)
         self.assertEqual(resolve_runway_ratio(package), "720:1280")
+
+    @patch.dict("os.environ", {}, clear=True)
+    def test_resolve_runway_ratio_maps_supported_aspect_ratios(self):
+        tall_package = build_scene_package({**self.spec, "aspect_ratio": "9:16"})
+        square_package = build_scene_package({**self.spec, "aspect_ratio": "1:1"})
+        self.assertEqual(resolve_runway_ratio(tall_package), "720:1280")
+        self.assertEqual(resolve_runway_ratio(square_package), "960:960")
+
+    def test_parse_env_value_supports_quotes_and_inline_comments(self):
+        self.assertEqual(parse_env_value(" plain "), "plain")
+        self.assertEqual(parse_env_value('"quoted value"'), "quoted value")
+        self.assertEqual(parse_env_value("value # comment"), "value")
 
     def test_runway_adapter_submits_all_shots(self):
         package = build_scene_package(self.spec)
