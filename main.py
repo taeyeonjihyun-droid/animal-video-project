@@ -114,6 +114,11 @@ def generate_image_prompts(output_override: str | None = None):
         else cfg.get("image_prompt_output", "output/scene_image_prompts.json")
     )
     out = selected_output if selected_output.is_absolute() else ROOT / selected_output
+    resolved_out = out.resolve()
+    resolved_root = ROOT.resolve()
+    if not resolved_out.is_relative_to(resolved_root):
+        raise ValueError("프롬프트 출력 경로는 프로젝트 폴더 내부여야 합니다.")
+    out = resolved_out
     out.parent.mkdir(parents=True, exist_ok=True)
     payload = {
         "project_title": project_title,

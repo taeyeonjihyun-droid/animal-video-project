@@ -132,6 +132,8 @@ output/scene_image_prompts.json
 python main.py --generate-image-prompts --prompts-output output/my_prompts.json
 ```
 
+`--prompts-output` 경로는 프로젝트 폴더 내부 경로만 사용할 수 있습니다.
+
 ## 저작권 주의
 
 다른 유튜브 영상의 실제 영상/음원/자막을 그대로 복사하지 말고,  
