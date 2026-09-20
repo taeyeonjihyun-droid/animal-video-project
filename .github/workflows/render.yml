@@ -57,5 +57,5 @@ jobs:
         with:
           name: rendered-animal-video
           path: output/*.mp4
-          if-no-files-found: warn
+          if-no-files-found: error
           retention-days: 7
