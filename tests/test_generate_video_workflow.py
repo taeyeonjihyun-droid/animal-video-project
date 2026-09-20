@@ -248,6 +248,17 @@ class GenerateVideoWorkflowTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "RUNWAY_PROMPT_IMAGE is required"):
                 adapter.run(package, Path(temp_dir))
 
+    def test_runway_adapter_rejects_invalid_generation_mode(self):
+        with self.assertRaisesRegex(ValueError, "RUNWAY_GENERATION_MODE must be"):
+            RunwayAdapter(
+                api_key="secret",
+                model="gen4_turbo",
+                generation_mode="bad-mode",
+                duration="auto",
+                prompt_image=None,
+                client_factory=lambda api_key: None,
+            )
+
     def test_runway_adapter_wraps_submission_errors(self):
         package = build_scene_package(self.spec)
 

@@ -36,7 +36,7 @@ The structured scene spec includes:
 - Python 3.10+
 - `pip install -r requirements.txt`
 
-No extra dependencies are required for the workflow packager.
+The repository requirements now include the official Runway SDK, so no separate manual package install is needed for Runway support beyond `pip install -r requirements.txt`.
 
 ## Configuration
 

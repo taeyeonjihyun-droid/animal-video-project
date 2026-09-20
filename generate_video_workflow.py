@@ -295,6 +295,8 @@ class RunwayAdapter(ProviderAdapter):
         prompt_image: str | None,
         client_factory: Any | None = None,
     ) -> None:
+        if generation_mode not in {"text_to_video", "image_to_video"}:
+            raise ValueError("RUNWAY_GENERATION_MODE must be text_to_video or image_to_video.")
         self.api_key = api_key
         self.model = model
         self.generation_mode = generation_mode
@@ -428,7 +430,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--provider",
         default=None,
-        help="Provider adapter name. Supported: dry-run, generic-webhook.",
+        help="Provider adapter name. Supported: dry-run, generic-webhook, runway.",
     )
     parser.add_argument(
         "--env-file",
