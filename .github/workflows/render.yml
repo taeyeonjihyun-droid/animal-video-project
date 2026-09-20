@@ -43,6 +43,7 @@ jobs:
         run: python main.py
 
       - name: Check rendered videos
+        shell: bash
         run: |
           shopt -s nullglob
           files=(output/*.mp4)
