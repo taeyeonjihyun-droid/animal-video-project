@@ -12,15 +12,21 @@ on:
           - render
           - prompts
           - both
+          - batch
+      batch_file:
+        description: "배치 설정 JSON 경로 (run_mode=batch일 때 사용)"
+        required: false
+        default: "batch_config.json"
+        type: string
 
 permissions:
   contents: read
 
 env:
-  RUN_MODE: ${{ contains(fromJSON('["render","prompts","both"]'), github.event.inputs.run_mode) && github.event.inputs.run_mode || 'render' }}
+  RUN_MODE: ${{ contains(fromJSON('["render","prompts","both","batch"]'), github.event.inputs.run_mode) && github.event.inputs.run_mode || 'render' }}
 
 concurrency:
-  group: render-${{ github.workflow }}-${{ github.ref }}-${{ contains(fromJSON('["render","prompts","both"]'), github.event.inputs.run_mode) && github.event.inputs.run_mode || 'render' }}
+  group: render-${{ github.workflow }}-${{ github.ref }}-${{ contains(fromJSON('["render","prompts","both","batch"]'), github.event.inputs.run_mode) && github.event.inputs.run_mode || 'render' }}
   cancel-in-progress: true
 
 jobs:
@@ -60,8 +66,12 @@ jobs:
         if: ${{ env.RUN_MODE == 'render' || env.RUN_MODE == 'both' }}
         run: python main.py
 
+      - name: Render batch videos
+        if: ${{ env.RUN_MODE == 'batch' }}
+        run: python main.py --batch-render --batch-file "${{ github.event.inputs.batch_file }}"
+
       - name: Check rendered videos
-        if: ${{ env.RUN_MODE == 'render' || env.RUN_MODE == 'both' }}
+        if: ${{ env.RUN_MODE == 'render' || env.RUN_MODE == 'both' || env.RUN_MODE == 'batch' }}
         shell: bash
         run: |
           shopt -s nullglob
@@ -79,7 +89,7 @@ jobs:
           echo "프롬프트 결과 확인: output/scene_image_prompts.json"
 
       - name: Upload rendered video
-        if: ${{ env.RUN_MODE == 'render' || env.RUN_MODE == 'both' }}
+        if: ${{ env.RUN_MODE == 'render' || env.RUN_MODE == 'both' || env.RUN_MODE == 'batch' }}
         uses: actions/upload-artifact@v4
         with:
           name: rendered-animal-video
