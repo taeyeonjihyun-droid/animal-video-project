@@ -20,6 +20,7 @@ from generate_video_workflow import (
     parse_runway_duration,
     parse_timeout,
     resolve_runway_ratio,
+    resolve_runway_duration_for_shot,
     validate_scene_spec,
 )
 
@@ -107,6 +108,18 @@ class GenerateVideoWorkflowTests(unittest.TestCase):
         self.assertIsNone(parse_optional_runway_duration(None))
         self.assertIsNone(parse_optional_runway_duration(""))
         self.assertEqual(parse_optional_runway_duration("auto"), "auto")
+
+    def test_resolve_runway_duration_for_shot_requires_whole_seconds_without_override(self):
+        self.assertEqual(
+            resolve_runway_duration_for_shot({"id": "shot_01", "duration_seconds": 4}, None),
+            4,
+        )
+        self.assertEqual(
+            resolve_runway_duration_for_shot({"id": "shot_01", "duration_seconds": 4.5}, "auto"),
+            "auto",
+        )
+        with self.assertRaisesRegex(ValueError, "whole number of seconds"):
+            resolve_runway_duration_for_shot({"id": "shot_01", "duration_seconds": 4.5}, None)
 
     def test_decode_provider_response_supports_plain_text(self):
         self.assertEqual(decode_provider_response(""), {})

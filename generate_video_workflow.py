@@ -187,9 +187,7 @@ def import_runway_client():
     try:
         from runwayml import RunwayML
     except ImportError as exc:
-        raise RuntimeError(
-            "Runway SDK is not installed. Run `pip install -r requirements.txt` first."
-        ) from exc
+        raise RuntimeError("Runway SDK dependency is missing: runwayml.") from exc
     return RunwayML
 
 
@@ -223,6 +221,17 @@ def resolve_runway_ratio(package: dict[str, Any]) -> str:
         "1:1": "960:960",
     }
     return aspect_to_ratio.get(aspect_ratio, "1280:720")
+
+
+def resolve_runway_duration_for_shot(shot: dict[str, Any], override: str | int | None) -> str | int:
+    if override is not None:
+        return override
+    shot_duration = float(shot["duration_seconds"])
+    if not shot_duration.is_integer():
+        raise ValueError(
+            f"Shot {shot['id']} duration must be a whole number of seconds for Runway unless RUNWAY_DURATION is set."
+        )
+    return int(shot_duration)
 
 
 def serialize_runway_task(task: Any) -> dict[str, Any]:
@@ -345,7 +354,7 @@ class RunwayAdapter(ProviderAdapter):
                 "model": self.model,
                 "prompt_text": shot["prompt"],
                 "ratio": ratio,
-                "duration": self.duration if self.duration is not None else int(shot["duration_seconds"]),
+                "duration": resolve_runway_duration_for_shot(shot, self.duration),
                 "negative_prompt": shot["negative_prompt"],
             }
             if self.generation_mode == "image_to_video":
