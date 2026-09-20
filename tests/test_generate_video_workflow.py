@@ -52,6 +52,8 @@ class GenerateVideoWorkflowTests(unittest.TestCase):
 
     def test_parse_timeout_rejects_non_positive_values(self):
         self.assertEqual(parse_timeout("120"), 120)
+        with self.assertRaisesRegex(ValueError, "integer number of seconds"):
+            parse_timeout("abc")
         with self.assertRaisesRegex(ValueError, "greater than 0"):
             parse_timeout("0")
         with self.assertRaisesRegex(ValueError, "greater than 0"):
@@ -63,6 +65,14 @@ class GenerateVideoWorkflowTests(unittest.TestCase):
         self.assertEqual(
             decode_provider_response("job-12345"),
             {"raw_response": "job-12345"},
+        )
+        self.assertEqual(
+            decode_provider_response('["job-1", "job-2"]'),
+            {"parsed_response": ["job-1", "job-2"]},
+        )
+        self.assertEqual(
+            decode_provider_response('"job-12345"'),
+            {"parsed_response": "job-12345"},
         )
 
 

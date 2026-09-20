@@ -22,7 +22,10 @@ def load_env_file(env_file: Path) -> None:
         if not line or line.startswith("#") or "=" not in line:
             continue
         key, value = line.split("=", 1)
-        os.environ.setdefault(key.strip(), value.strip())
+        value = value.strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in {'"', "'"}:
+            value = value[1:-1]
+        os.environ.setdefault(key.strip(), value)
 
 
 def load_scene_spec(path: Path) -> dict[str, Any]:
@@ -51,9 +54,12 @@ def validate_scene_spec(spec: dict[str, Any]) -> None:
     if len(shots) != 4:
         raise ValueError("Scene spec must define exactly four shots.")
 
+    expected_duration = float(spec.get("duration_seconds", 15))
     total_duration = sum(float(shot["duration_seconds"]) for shot in shots)
-    if abs(total_duration - 15.0) > 1e-6:
-        raise ValueError(f"Shot durations must total 15 seconds, got {total_duration}.")
+    if abs(total_duration - expected_duration) > 1e-6:
+        raise ValueError(
+            f"Shot durations must total {expected_duration} seconds, got {total_duration}."
+        )
 
     expected_names = {"dog", "cat", "red panda", "giant panda", "fennec fox"}
     actual_names = {character["name"] for character in characters}
@@ -108,7 +114,7 @@ def build_scene_package(spec: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def write_json(path: Path, payload: dict[str, Any]) -> None:
+def write_json(path: Path, payload: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
@@ -127,9 +133,12 @@ def decode_provider_response(response_text: str) -> dict[str, Any]:
     if not response_text:
         return {}
     try:
-        return json.loads(response_text)
+        payload = json.loads(response_text)
     except JSONDecodeError:
         return {"raw_response": response_text}
+    if isinstance(payload, dict):
+        return payload
+    return {"parsed_response": payload}
 
 
 class ProviderAdapter(ABC):
@@ -205,6 +214,7 @@ class GenericWebhookAdapter(ProviderAdapter):
 
 
 def build_adapter(provider: str, dry_run: bool) -> ProviderAdapter:
+    provider = provider.strip().lower()
     if dry_run or provider == "dry-run":
         return DryRunAdapter()
     if provider == "generic-webhook":
