@@ -254,13 +254,13 @@ def build_adapter(provider: str, dry_run: bool) -> ProviderAdapter:
     raise ValueError(f"Unsupported VIDEO_PROVIDER: {provider}")
 
 
-def resolve_config_path(value: str | None, default_path: Path, cwd: Path) -> Path:
+def resolve_config_path(value: str | None, default_path: Path, base_dir: Path) -> Path:
     if value is None:
         return default_path
     path = Path(value)
     if path.is_absolute():
         return path
-    return cwd / path
+    return base_dir / path
 
 
 def parse_args() -> argparse.Namespace:
@@ -299,12 +299,20 @@ def main() -> int:
     env_file_path = resolve_config_path(args.env_file, cwd / ".env", cwd)
     load_env_file(env_file_path)
 
-    spec_value = args.spec or os.environ.get("VIDEO_SCENE_SPEC")
-    output_dir_value = args.output_dir or os.environ.get("VIDEO_OUTPUT_DIR")
+    spec_env_value = os.environ.get("VIDEO_SCENE_SPEC")
+    output_dir_env_value = os.environ.get("VIDEO_OUTPUT_DIR")
     provider_value = args.provider or os.environ.get("VIDEO_PROVIDER", "dry-run")
 
-    spec_path = resolve_config_path(spec_value, DEFAULT_SCENE_SPEC, cwd)
-    output_dir = resolve_config_path(output_dir_value, DEFAULT_OUTPUT_DIR, cwd)
+    spec_path = (
+        resolve_config_path(args.spec, DEFAULT_SCENE_SPEC, cwd)
+        if args.spec is not None
+        else resolve_config_path(spec_env_value, DEFAULT_SCENE_SPEC, ROOT)
+    )
+    output_dir = (
+        resolve_config_path(args.output_dir, DEFAULT_OUTPUT_DIR, cwd)
+        if args.output_dir is not None
+        else resolve_config_path(output_dir_env_value, DEFAULT_OUTPUT_DIR, ROOT)
+    )
 
     spec = load_scene_spec(spec_path)
     validate_scene_spec(spec)
