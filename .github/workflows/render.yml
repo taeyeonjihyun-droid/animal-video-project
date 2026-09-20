@@ -17,10 +17,10 @@ permissions:
   contents: read
 
 env:
-  RUN_MODE: ${{ github.event.inputs.run_mode || 'render' }}
+  RUN_MODE: ${{ contains(fromJSON('["render","prompts","both"]'), github.event.inputs.run_mode) && github.event.inputs.run_mode || 'render' }}
 
 concurrency:
-  group: render-${{ github.workflow }}-${{ github.ref }}-${{ github.event.inputs.run_mode || 'render' }}
+  group: render-${{ github.workflow }}-${{ github.ref }}-${{ contains(fromJSON('["render","prompts","both"]'), github.event.inputs.run_mode) && github.event.inputs.run_mode || 'render' }}
   cancel-in-progress: true
 
 jobs:
