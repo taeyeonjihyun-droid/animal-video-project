@@ -165,6 +165,54 @@ def decode_provider_response(response_text: str) -> dict[str, Any]:
     return {"parsed_response": payload}
 
 
+def import_runway_client():
+    try:
+        from runwayml import RunwayML
+    except ImportError as exc:
+        raise RuntimeError(
+            "Runway SDK is not installed. Run `pip install -r requirements.txt` first."
+        ) from exc
+    return RunwayML
+
+
+def parse_runway_duration(duration_value: str) -> str | int:
+    value = duration_value.strip().lower()
+    if value == "auto":
+        return "auto"
+    try:
+        duration = int(value)
+    except ValueError as exc:
+        raise ValueError("RUNWAY_DURATION must be 'auto' or an integer number of seconds.") from exc
+    if duration <= 0:
+        raise ValueError("RUNWAY_DURATION must be greater than 0 seconds.")
+    return duration
+
+
+def resolve_runway_ratio(package: dict[str, Any]) -> str:
+    ratio_value = os.environ.get("RUNWAY_RATIO", "").strip()
+    if ratio_value:
+        return ratio_value
+    aspect_ratio = str(package.get("aspect_ratio", "16:9")).strip()
+    aspect_to_ratio = {
+        "16:9": "1280:720",
+        "9:16": "720:1280",
+        "1:1": "960:960",
+    }
+    return aspect_to_ratio.get(aspect_ratio, "1280:720")
+
+
+def serialize_runway_task(task: Any) -> dict[str, Any]:
+    if hasattr(task, "model_dump"):
+        payload = task.model_dump()
+        if isinstance(payload, dict):
+            return payload
+    if hasattr(task, "to_dict"):
+        payload = task.to_dict()
+        if isinstance(payload, dict):
+            return payload
+    return {"id": getattr(task, "id", None)}
+
+
 class ProviderAdapter(ABC):
     @abstractmethod
     def run(self, package: dict[str, Any], output_dir: Path) -> dict[str, Any]:
@@ -237,10 +285,112 @@ class GenericWebhookAdapter(ProviderAdapter):
         return result
 
 
+class RunwayAdapter(ProviderAdapter):
+    def __init__(
+        self,
+        api_key: str,
+        model: str,
+        generation_mode: str,
+        duration: str | int,
+        prompt_image: str | None,
+        client_factory: Any | None = None,
+    ) -> None:
+        self.api_key = api_key
+        self.model = model
+        self.generation_mode = generation_mode
+        self.duration = duration
+        self.prompt_image = prompt_image
+        self.client_factory = client_factory or import_runway_client()
+
+    def run(self, package: dict[str, Any], output_dir: Path) -> dict[str, Any]:
+        client = self.client_factory(api_key=self.api_key)
+        ratio = resolve_runway_ratio(package)
+        prompt_image = self.prompt_image.strip() if self.prompt_image else None
+        tasks = []
+
+        write_json(output_dir / "scene_package.json", package)
+
+        for shot in package["shots"]:
+            create_kwargs = {
+                "model": self.model,
+                "prompt_text": shot["prompt"],
+                "ratio": ratio,
+                "duration": self.duration,
+                "negative_prompt": shot["negative_prompt"],
+            }
+            if self.generation_mode == "image_to_video":
+                if not prompt_image:
+                    raise ValueError(
+                        "RUNWAY_PROMPT_IMAGE is required when RUNWAY_GENERATION_MODE=image_to_video."
+                    )
+                create_kwargs["prompt_image"] = prompt_image
+                try:
+                    task = client.image_to_video.create(**create_kwargs)
+                except Exception as exc:
+                    raise RuntimeError(
+                        f"Runway submission failed for shot {shot['id']}: {exc}"
+                    ) from exc
+            else:
+                try:
+                    task = client.text_to_video.create(**create_kwargs)
+                except Exception as exc:
+                    raise RuntimeError(
+                        f"Runway submission failed for shot {shot['id']}: {exc}"
+                    ) from exc
+
+            tasks.append(
+                {
+                    "shot_id": shot["id"],
+                    "task_id": getattr(task, "id", None),
+                    "request": create_kwargs,
+                    "response": serialize_runway_task(task),
+                }
+            )
+
+        response_payload = {
+            "provider": "runway",
+            "generation_mode": self.generation_mode,
+            "model": self.model,
+            "ratio": ratio,
+            "tasks": tasks,
+        }
+        result = {
+            "provider": "runway",
+            "status": "submitted",
+            "output_dir": str(output_dir),
+            "scene_package": str(output_dir / "scene_package.json"),
+            "response_payload": str(output_dir / "submission_response.json"),
+        }
+        write_json(output_dir / "submission_response.json", response_payload)
+        write_json(output_dir / "run_summary.json", result)
+        return result
+
+
 def build_adapter(provider: str, dry_run: bool) -> ProviderAdapter:
     provider = provider.strip().lower()
     if dry_run or provider == "dry-run":
         return DryRunAdapter()
+    if provider == "runway":
+        api_key = (
+            os.environ.get("RUNWAYML_API_SECRET")
+            or os.environ.get("RUNWAY_API_KEY")
+            or os.environ.get("VIDEO_API_KEY")
+            or ""
+        ).strip()
+        if not api_key:
+            raise ValueError(
+                "RUNWAYML_API_SECRET, RUNWAY_API_KEY, or VIDEO_API_KEY is required when VIDEO_PROVIDER=runway."
+            )
+        generation_mode = os.environ.get("RUNWAY_GENERATION_MODE", "text_to_video").strip().lower()
+        if generation_mode not in {"text_to_video", "image_to_video"}:
+            raise ValueError("RUNWAY_GENERATION_MODE must be text_to_video or image_to_video.")
+        return RunwayAdapter(
+            api_key=api_key,
+            model=os.environ.get("RUNWAY_MODEL", "gen4_turbo").strip() or "gen4_turbo",
+            generation_mode=generation_mode,
+            duration=parse_runway_duration(os.environ.get("RUNWAY_DURATION", "auto")),
+            prompt_image=os.environ.get("RUNWAY_PROMPT_IMAGE"),
+        )
     if provider == "generic-webhook":
         api_url = os.environ.get("VIDEO_API_URL", "").strip()
         if not api_url:

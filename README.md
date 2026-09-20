@@ -48,7 +48,7 @@ cp .env.example .env
 
 Environment variables:
 
-- `VIDEO_PROVIDER`: `dry-run` or `generic-webhook`
+- `VIDEO_PROVIDER`: `dry-run`, `generic-webhook`, or `runway`
 - `VIDEO_SCENE_SPEC`: scene spec JSON path  
   default: `animal_travel_preparation_scene.json`
 - `VIDEO_OUTPUT_DIR`: output directory  
@@ -56,6 +56,12 @@ Environment variables:
 - `VIDEO_API_URL`: required only for `generic-webhook`
 - `VIDEO_API_KEY`: optional bearer token for `generic-webhook`
 - `VIDEO_API_TIMEOUT`: optional HTTP timeout in seconds
+- `RUNWAYML_API_SECRET`: Runway API key for `runway`
+- `RUNWAY_MODEL`: Runway model name, default `gen4_turbo`
+- `RUNWAY_GENERATION_MODE`: `text_to_video` or `image_to_video`
+- `RUNWAY_DURATION`: `auto` or integer seconds
+- `RUNWAY_RATIO`: optional explicit Runway ratio override
+- `RUNWAY_PROMPT_IMAGE`: required only for `image_to_video`
 
 ## Dry-run usage
 
@@ -94,11 +100,35 @@ This writes the request package locally and stores the provider response as:
 output/video_generation_package/submission_response.json
 ```
 
+## Runway submission usage
+
+Install dependencies first:
+
+```bash
+pip install -r requirements.txt
+```
+
+Set Runway configuration:
+
+```bash
+export VIDEO_PROVIDER=runway
+export RUNWAYML_API_SECRET="replace-with-your-runway-key"
+export RUNWAY_MODEL="gen4_turbo"
+export RUNWAY_GENERATION_MODE="text_to_video"
+python generate_video_workflow.py
+```
+
+Notes:
+
+- `text_to_video` is the default because this repository packages text prompts per shot.
+- If you want `image_to_video`, also set `RUNWAY_PROMPT_IMAGE` to an image URL or supported prompt image reference.
+- The workflow submits one Runway task per shot and stores the task IDs in `output/video_generation_package/submission_response.json`.
+
 ## How to generate the final video
 
 1. Review or edit `animal_travel_preparation_scene.json`.
 2. Run `python generate_video_workflow.py --dry-run` to validate the package.
-3. Point `VIDEO_PROVIDER=generic-webhook` to your compatible video-generation API.
+3. Point `VIDEO_PROVIDER=generic-webhook` to your compatible video-generation API, or set `VIDEO_PROVIDER=runway` with your Runway API key.
 4. Run `python generate_video_workflow.py` to submit the four-shot package.
 5. Retrieve the final rendered video from your provider using the saved response metadata in `output/video_generation_package/submission_response.json`.
 

@@ -9,11 +9,14 @@ from urllib import error
 from generate_video_workflow import (
     DEFAULT_SCENE_SPEC,
     GenericWebhookAdapter,
+    RunwayAdapter,
     build_scene_package,
     build_shot_prompt,
     decode_provider_response,
     load_scene_spec,
+    parse_runway_duration,
     parse_timeout,
+    resolve_runway_ratio,
     validate_scene_spec,
 )
 
@@ -89,6 +92,14 @@ class GenerateVideoWorkflowTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "greater than 0"):
             parse_timeout("-3")
 
+    def test_parse_runway_duration_supports_auto_and_ints(self):
+        self.assertEqual(parse_runway_duration("auto"), "auto")
+        self.assertEqual(parse_runway_duration("6"), 6)
+        with self.assertRaisesRegex(ValueError, "integer number of seconds"):
+            parse_runway_duration("bad")
+        with self.assertRaisesRegex(ValueError, "greater than 0"):
+            parse_runway_duration("0")
+
     def test_decode_provider_response_supports_plain_text(self):
         self.assertEqual(decode_provider_response(""), {})
         self.assertEqual(decode_provider_response('{"job_id":"abc"}'), {"job_id": "abc"})
@@ -157,6 +168,109 @@ class GenerateVideoWorkflowTests(unittest.TestCase):
             ):
                 with self.assertRaisesRegex(RuntimeError, "connection refused"):
                     adapter.run(package, Path(temp_dir))
+
+    @patch.dict("os.environ", {}, clear=True)
+    def test_resolve_runway_ratio_uses_scene_aspect_ratio(self):
+        package = build_scene_package(self.spec)
+        self.assertEqual(resolve_runway_ratio(package), "1280:720")
+
+    @patch.dict("os.environ", {"RUNWAY_RATIO": "720:1280"}, clear=True)
+    def test_resolve_runway_ratio_prefers_env_override(self):
+        package = build_scene_package(self.spec)
+        self.assertEqual(resolve_runway_ratio(package), "720:1280")
+
+    def test_runway_adapter_submits_all_shots(self):
+        package = build_scene_package(self.spec)
+
+        class FakeTask:
+            def __init__(self, task_id):
+                self.id = task_id
+
+            def model_dump(self):
+                return {"id": self.id, "status": "queued"}
+
+        class FakeTextToVideo:
+            def __init__(self):
+                self.calls = []
+
+            def create(self, **kwargs):
+                self.calls.append(kwargs)
+                return FakeTask(f"task-{len(self.calls)}")
+
+        class FakeClient:
+            def __init__(self, api_key):
+                self.api_key = api_key
+                self.text_to_video = FakeTextToVideo()
+
+        created_clients = []
+
+        def factory(api_key):
+            client = FakeClient(api_key)
+            created_clients.append(client)
+            return client
+
+        adapter = RunwayAdapter(
+            api_key="secret",
+            model="gen4_turbo",
+            generation_mode="text_to_video",
+            duration="auto",
+            prompt_image=None,
+            client_factory=factory,
+        )
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            result = adapter.run(package, Path(temp_dir))
+            self.assertEqual(result["status"], "submitted")
+            response_payload = load_scene_spec(Path(result["response_payload"]))
+
+        self.assertEqual(len(response_payload["tasks"]), 4)
+        self.assertEqual(created_clients[0].api_key, "secret")
+        self.assertEqual(len(created_clients[0].text_to_video.calls), 4)
+        self.assertEqual(created_clients[0].text_to_video.calls[0]["model"], "gen4_turbo")
+
+    def test_runway_adapter_requires_prompt_image_for_image_mode(self):
+        package = build_scene_package(self.spec)
+
+        class FakeClient:
+            def __init__(self, api_key):
+                self.image_to_video = object()
+
+        adapter = RunwayAdapter(
+            api_key="secret",
+            model="gen4_turbo",
+            generation_mode="image_to_video",
+            duration="auto",
+            prompt_image=None,
+            client_factory=lambda api_key: FakeClient(api_key),
+        )
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with self.assertRaisesRegex(ValueError, "RUNWAY_PROMPT_IMAGE is required"):
+                adapter.run(package, Path(temp_dir))
+
+    def test_runway_adapter_wraps_submission_errors(self):
+        package = build_scene_package(self.spec)
+
+        class FakeTextToVideo:
+            def create(self, **kwargs):
+                raise RuntimeError("boom")
+
+        class FakeClient:
+            def __init__(self, api_key):
+                self.text_to_video = FakeTextToVideo()
+
+        adapter = RunwayAdapter(
+            api_key="secret",
+            model="gen4_turbo",
+            generation_mode="text_to_video",
+            duration="auto",
+            prompt_image=None,
+            client_factory=lambda api_key: FakeClient(api_key),
+        )
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with self.assertRaisesRegex(RuntimeError, "Runway submission failed for shot shot_01"):
+                adapter.run(package, Path(temp_dir))
 
 
 if __name__ == "__main__":
