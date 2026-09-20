@@ -1,4 +1,5 @@
 import unittest
+from copy import deepcopy
 from pathlib import Path
 
 from generate_video_workflow import (
@@ -19,6 +20,18 @@ class GenerateVideoWorkflowTests(unittest.TestCase):
 
     def test_scene_spec_is_valid(self):
         validate_scene_spec(self.spec)
+
+    def test_scene_spec_rejects_invalid_character_count(self):
+        invalid_spec = deepcopy(self.spec)
+        invalid_spec["character_bible"] = invalid_spec["character_bible"][:-1]
+        with self.assertRaisesRegex(ValueError, "exactly five characters"):
+            validate_scene_spec(invalid_spec)
+
+    def test_scene_spec_rejects_invalid_shot_count(self):
+        invalid_spec = deepcopy(self.spec)
+        invalid_spec["shots"] = invalid_spec["shots"][:-1]
+        with self.assertRaisesRegex(ValueError, "exactly four shots"):
+            validate_scene_spec(invalid_spec)
 
     def test_scene_package_contains_four_consistent_shots(self):
         package = build_scene_package(self.spec)

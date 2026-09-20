@@ -55,7 +55,17 @@ def validate_scene_spec(spec: dict[str, Any]) -> None:
         raise ValueError("Scene spec must define exactly four shots.")
 
     expected_duration = float(spec.get("duration_seconds", 15))
-    total_duration = sum(float(shot["duration_seconds"]) for shot in shots)
+    total_duration = 0.0
+    running_offset = 0.0
+    for shot in shots:
+        start_seconds = float(shot["start_seconds"])
+        duration_seconds = float(shot["duration_seconds"])
+        if abs(start_seconds - running_offset) > 1e-6:
+            raise ValueError(
+                f"Shot {shot['id']} must start at {running_offset} seconds, got {start_seconds}."
+            )
+        total_duration += duration_seconds
+        running_offset += duration_seconds
     if abs(total_duration - expected_duration) > 1e-6:
         raise ValueError(
             f"Shot durations must total {expected_duration} seconds, got {total_duration}."
@@ -230,6 +240,15 @@ def build_adapter(provider: str, dry_run: bool) -> ProviderAdapter:
     raise ValueError(f"Unsupported VIDEO_PROVIDER: {provider}")
 
 
+def resolve_config_path(value: str | None, default_path: Path, cwd: Path) -> Path:
+    if value is None:
+        return default_path
+    path = Path(value)
+    if path.is_absolute():
+        return path
+    return cwd / path
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Generate or submit a packaged AI video workflow.")
     parser.add_argument(
@@ -262,22 +281,16 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
-    env_file_path = Path(args.env_file)
-    if not env_file_path.is_absolute():
-        env_file_path = ROOT / env_file_path
+    cwd = Path.cwd()
+    env_file_path = resolve_config_path(args.env_file, cwd / ".env", cwd)
     load_env_file(env_file_path)
 
-    spec_value = args.spec or os.environ.get("VIDEO_SCENE_SPEC", str(DEFAULT_SCENE_SPEC))
-    output_dir_value = args.output_dir or os.environ.get("VIDEO_OUTPUT_DIR", str(DEFAULT_OUTPUT_DIR))
+    spec_value = args.spec or os.environ.get("VIDEO_SCENE_SPEC")
+    output_dir_value = args.output_dir or os.environ.get("VIDEO_OUTPUT_DIR")
     provider_value = args.provider or os.environ.get("VIDEO_PROVIDER", "dry-run")
 
-    spec_path = Path(spec_value)
-    if not spec_path.is_absolute():
-        spec_path = ROOT / spec_path
-
-    output_dir = Path(output_dir_value)
-    if not output_dir.is_absolute():
-        output_dir = ROOT / output_dir
+    spec_path = resolve_config_path(spec_value, DEFAULT_SCENE_SPEC, cwd)
+    output_dir = resolve_config_path(output_dir_value, DEFAULT_OUTPUT_DIR, cwd)
 
     spec = load_scene_spec(spec_path)
     validate_scene_spec(spec)
