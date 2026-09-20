@@ -5,6 +5,23 @@ from main import validate_config, wrap_text, load_font
 
 
 class MainValidationTests(unittest.TestCase):
+    def test_validate_config_rejects_non_object_root(self):
+        with self.assertRaisesRegex(ValueError, "JSON 객체 형태여야 합니다"):
+            validate_config([])
+
+    def test_validate_config_rejects_missing_video(self):
+        cfg = {"scenes": [{"source": "assets/images/x.png", "duration": 4.0}]}
+        with self.assertRaisesRegex(ValueError, "`video` 설정이 없습니다"):
+            validate_config(cfg)
+
+    def test_validate_config_rejects_non_positive_video_numbers(self):
+        cfg = {
+            "video": {"width": 0, "height": 1920, "fps": 30},
+            "scenes": [{"source": "assets/images/x.png", "duration": 4.0}],
+        }
+        with self.assertRaisesRegex(ValueError, "영상 크기\\(width/height\\)는 1 이상의 정수여야 합니다"):
+            validate_config(cfg)
+
     def test_validate_config_rejects_empty_scenes(self):
         cfg = {
             "video": {"width": 1080, "height": 1920, "fps": 30},
@@ -35,6 +52,23 @@ class MainValidationTests(unittest.TestCase):
             "scenes": [{"source": "assets/images/x.png", "duration": "fast", "zoom": 1.0}],
         }
         with self.assertRaisesRegex(ValueError, "duration은 숫자여야 합니다"):
+            validate_config(cfg)
+
+    def test_validate_config_rejects_bad_scene_shape_or_missing_source(self):
+        cfg_bad_shape = {"video": {"width": 1080, "height": 1920, "fps": 30}, "scenes": ["bad"]}
+        with self.assertRaisesRegex(ValueError, "장면 형식이 잘못되었습니다"):
+            validate_config(cfg_bad_shape)
+
+        cfg_missing_source = {"video": {"width": 1080, "height": 1920, "fps": 30}, "scenes": [{}]}
+        with self.assertRaisesRegex(ValueError, "`source`가 없습니다"):
+            validate_config(cfg_missing_source)
+
+    def test_validate_config_rejects_non_positive_zoom(self):
+        cfg = {
+            "video": {"width": 1080, "height": 1920, "fps": 30},
+            "scenes": [{"source": "assets/images/x.png", "duration": 4.0, "zoom": 0}],
+        }
+        with self.assertRaisesRegex(ValueError, "zoom은 0보다 커야 합니다"):
             validate_config(cfg)
 
     def test_wrap_text_handles_korean_without_spaces(self):

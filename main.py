@@ -181,7 +181,8 @@ def wrap_text(draw: ImageDraw.ImageDraw, text: str, font, max_width: int, stroke
                 break
             lines[-1] = lines[-1][:-1]
             if not lines[-1]:
-                lines.pop()
+                lines[-1] = "…"
+                break
     return lines
 
 
@@ -345,6 +346,27 @@ def make_video_scene(
     return clip
 
 
+def make_placeholder_scene_clip(
+    scene_index: int,
+    duration: float,
+    caption: str,
+    size: Tuple[int, int],
+    fade_seconds: float,
+):
+    img = placeholder_scene(scene_index, caption, size)
+    base = ImageClip(np.array(img)).with_duration(duration)
+    canvas = CompositeVideoClip([base], size=size).with_duration(duration)
+
+    cap = ImageClip(caption_overlay(caption, size)).with_duration(duration)
+    canvas = CompositeVideoClip([canvas, cap], size=size).with_duration(duration)
+    if fade_seconds > 0:
+        canvas = canvas.with_effects([
+            vfx.FadeIn(min(fade_seconds, duration / 3)),
+            vfx.FadeOut(min(fade_seconds, duration / 3)),
+        ])
+    return canvas
+
+
 def build_video():
     cfg = load_config()
     validate_config(cfg)
@@ -371,10 +393,10 @@ def build_video():
                         clip = make_video_scene(source, duration, caption, size, fade_seconds)
                     except VideoSourceError:
                         print(f"[안내] 영상 열기 실패: {source.name} -> 임시 장면으로 대체")
-                        clip = make_image_scene(source, duration, caption, zoom, size, i, fade_seconds)
+                        clip = make_placeholder_scene_clip(i, duration, caption, size, fade_seconds)
                 else:
                     print(f"[안내] 영상 없음: {source.name} -> 임시 장면으로 대체")
-                    clip = make_image_scene(source, duration, caption, zoom, size, i, fade_seconds)
+                    clip = make_placeholder_scene_clip(i, duration, caption, size, fade_seconds)
             else:
                 clip = make_image_scene(source, duration, caption, zoom, size, i, fade_seconds)
             clips.append(clip)
@@ -391,7 +413,7 @@ def build_video():
 
         # BGM이 있으면 전체 길이에 맞춰 반복 후 믹싱
         bgm_path = ROOT / cfg.get("bgm", "")
-        if bgm_path.exists():
+        if bgm_path.exists() and bgm_path.is_file():
             bgm_source = AudioFileClip(str(bgm_path))
             bgm = bgm_source.with_effects([
                 afx.AudioLoop(duration=final.duration),
