@@ -540,14 +540,16 @@ def build_batch_videos(batch_file_override: str | None = None) -> None:
             must_exist=True,
         )
         cfg = load_config_from_path(config_path)
+        base_output_value = str(cfg.get("output", "output/animal_trip.mp4"))
         has_overrides = "overrides" in job
         overrides = job.get("overrides", {})
         if has_overrides and not isinstance(overrides, dict):
             raise ValueError(f"jobs[{index}].overrides는 객체(dict)여야 합니다.")
         if isinstance(overrides, dict) and overrides:
             cfg = deep_merge_dict(cfg, overrides)
-        if total_jobs > 1 and not (isinstance(overrides, dict) and "output" in overrides):
-            base_output = Path(str(cfg.get("output", "output/animal_trip.mp4")))
+        effective_output_value = str(cfg.get("output", "output/animal_trip.mp4"))
+        if total_jobs > 1 and effective_output_value == base_output_value:
+            base_output = Path(effective_output_value)
             suffix = base_output.suffix or ".mp4"
             stem = base_output.stem or "animal_trip"
             cfg["output"] = str(base_output.with_name(f"{stem}_{index:02d}{suffix}"))

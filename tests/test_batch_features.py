@@ -1,5 +1,6 @@
 import json
 import shutil
+import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -29,14 +30,15 @@ class BatchFeatureTests(unittest.TestCase):
         self.assertEqual(resolved, config_path)
 
     def test_resolve_repo_path_rejects_absolute_outside_repo(self):
-        outside = Path("/tmp/main-outside.json")
-        outside.write_text("{}", encoding="utf-8")
-        with self.assertRaises(ValueError):
-            main.resolve_repo_relative_path(
-                str(outside),
-                base_dir=Path.cwd(),
-                must_exist=True,
-            )
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            outside = Path(tmp_dir) / "main-outside.json"
+            outside.write_text("{}", encoding="utf-8")
+            with self.assertRaises(ValueError):
+                main.resolve_repo_relative_path(
+                    str(outside),
+                    base_dir=Path.cwd(),
+                    must_exist=True,
+                )
 
     def test_batch_config_path_is_relative_to_batch_file(self):
         batch_dir = self.tmp_dir / "nested"
