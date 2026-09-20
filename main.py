@@ -5,7 +5,7 @@ import copy
 import json
 import math
 from pathlib import Path
-from typing import Tuple
+from typing import Any, Tuple
 
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
@@ -25,26 +25,32 @@ CONFIG_PATH = ROOT / "config.json"
 
 
 def load_config() -> dict:
-    with CONFIG_PATH.open("r", encoding="utf-8") as f:
-        return json.load(f)
+    return load_config_from_path(CONFIG_PATH)
 
 
-def load_json(path: Path) -> dict:
+def load_json(path: Path) -> Any:
     with path.open("r", encoding="utf-8") as f:
         return json.load(f)
 
 
-def resolve_repo_relative_path(path_value: str, *, must_exist: bool, allow_parent_create: bool = False) -> Path:
+def load_config_from_path(path: Path) -> dict:
+    data = load_json(path)
+    if not isinstance(data, dict):
+        raise ValueError(f"설정 파일 최상위는 객체(dict)여야 합니다: {path}")
+    return data
+
+
+def resolve_repo_relative_path(
+    path_value: str,
+    *,
+    base_dir: Path,
+    must_exist: bool,
+    allow_parent_create: bool = False,
+) -> Path:
     rel = Path(path_value)
     if rel.is_absolute():
         raise ValueError("경로는 프로젝트 상대 경로로 입력해야 합니다.")
-    if ".." in rel.parts:
-        raise ValueError("경로에 상위 디렉터리(..)를 사용할 수 없습니다.")
-
-    target = ROOT / rel
-    if allow_parent_create:
-        target.parent.mkdir(parents=True, exist_ok=True)
-
+    target = base_dir / rel
     resolved_target = target.resolve()
     resolved_root = ROOT.resolve()
     try:
@@ -52,6 +58,8 @@ def resolve_repo_relative_path(path_value: str, *, must_exist: bool, allow_paren
     except ValueError:
         raise ValueError("경로는 프로젝트 폴더 내부여야 합니다.")
 
+    if allow_parent_create:
+        resolved_target.parent.mkdir(parents=True, exist_ok=True)
     if must_exist and not resolved_target.exists():
         raise ValueError(f"파일을 찾을 수 없습니다: {path_value}")
     return resolved_target
@@ -137,6 +145,19 @@ def build_scene_prompt(
 
 def generate_image_prompts(output_override: str | None = None) -> None:
     cfg = load_config()
+    generate_image_prompts_from_config(
+        cfg=cfg,
+        config_dir=CONFIG_PATH.parent,
+        output_override=output_override,
+    )
+
+
+def generate_image_prompts_from_config(
+    cfg: dict,
+    *,
+    config_dir: Path,
+    output_override: str | None = None,
+) -> None:
     vcfg = cfg.get("video", {})
     width = int(vcfg.get("width", 1280))
     height = int(vcfg.get("height", 720))
@@ -182,6 +203,7 @@ def generate_image_prompts(output_override: str | None = None) -> None:
         raise ValueError("프롬프트 출력 경로는 비어 있을 수 없습니다.")
     out = resolve_repo_relative_path(
         selected_output,
+        base_dir=ROOT if output_override else config_dir,
         must_exist=False,
         allow_parent_create=True,
     )
@@ -495,8 +517,10 @@ def build_video_from_config(cfg: dict) -> None:
 
 def build_batch_videos(batch_file_override: str | None = None) -> None:
     batch_file = batch_file_override or "batch_config.json"
-    batch_path = resolve_repo_relative_path(batch_file, must_exist=True)
+    batch_path = resolve_repo_relative_path(batch_file, base_dir=ROOT, must_exist=True)
     batch_cfg = load_json(batch_path)
+    if not isinstance(batch_cfg, dict):
+        raise ValueError("배치 설정 파일 최상위는 객체(dict)여야 합니다.")
     jobs = batch_cfg.get("jobs")
     if not isinstance(jobs, list) or not jobs:
         raise ValueError("배치 설정 파일에는 1개 이상의 jobs 목록이 필요합니다.")
@@ -509,8 +533,12 @@ def build_batch_videos(batch_file_override: str | None = None) -> None:
         if not isinstance(config_rel, str) or not config_rel.strip():
             raise ValueError(f"jobs[{index}].config는 필수 문자열입니다.")
 
-        config_path = resolve_repo_relative_path(config_rel, must_exist=True)
-        cfg = load_json(config_path)
+        config_path = resolve_repo_relative_path(
+            config_rel,
+            base_dir=batch_path.parent,
+            must_exist=True,
+        )
+        cfg = load_config_from_path(config_path)
         overrides = job.get("overrides", {})
         if overrides:
             if not isinstance(overrides, dict):
