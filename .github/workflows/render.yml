@@ -37,7 +37,7 @@ jobs:
       - name: Clean previous outputs
         run: |
           mkdir -p output
-          rm -rf output/*
+          find output -mindepth 1 -delete
 
       - name: Render video
         run: python main.py
