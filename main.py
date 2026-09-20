@@ -47,10 +47,8 @@ def resolve_repo_relative_path(
     must_exist: bool,
     allow_parent_create: bool = False,
 ) -> Path:
-    rel = Path(path_value)
-    if rel.is_absolute():
-        raise ValueError("경로는 프로젝트 상대 경로로 입력해야 합니다.")
-    target = base_dir / rel
+    raw_path = Path(path_value)
+    target = raw_path if raw_path.is_absolute() else (base_dir / raw_path)
     resolved_target = target.resolve()
     resolved_root = ROOT.resolve()
     try:
@@ -91,7 +89,7 @@ def parse_args() -> argparse.Namespace:
         "--prompts-output",
         type=str,
         default=None,
-        help="프롬프트 JSON 출력 경로 (프로젝트 루트 기준 상대 경로, 기본: output/scene_image_prompts.json)",
+        help="프롬프트 JSON 출력 경로 (프로젝트 내부 경로, 기본: output/scene_image_prompts.json)",
     )
     parser.add_argument(
         "--batch-render",
@@ -102,7 +100,7 @@ def parse_args() -> argparse.Namespace:
         "--batch-file",
         type=str,
         default=None,
-        help="배치 설정 JSON 경로 (현재 작업 디렉터리 기준 상대 경로, 기본: batch_config.json)",
+        help="배치 설정 JSON 경로 (현재 디렉터리 기준 상대 경로 또는 절대 경로, 기본: batch_config.json)",
     )
     args = parser.parse_args()
     if args.prompts_output and not args.generate_image_prompts:
