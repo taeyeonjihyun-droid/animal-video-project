@@ -82,7 +82,7 @@ jobs:
           echo "배치 렌더링 실패 원인 요약"
           echo "## 배치 렌더링 실패 원인 요약" >> "$GITHUB_STEP_SUMMARY"
           if [ -f output/batch_render.log ]; then
-            summary_lines="$(grep -Ei 'traceback|error|exception|failed|valueerror|filenotfounderror' output/batch_render.log | tail -n 20 || true)"
+            summary_lines="$(grep -E 'Traceback \(most recent call last\):|[A-Za-z_]+(Error|Exception):|오류|실패' output/batch_render.log | tail -n 20 || true)"
             if [ -z "$summary_lines" ]; then
               summary_lines="$(tail -n 40 output/batch_render.log || true)"
             fi
