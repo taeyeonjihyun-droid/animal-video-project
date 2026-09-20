@@ -23,6 +23,10 @@ CONFIG_PATH = ROOT / "config.json"
 VIDEO_EXTENSIONS = {".mp4", ".mov", ".mkv", ".webm", ".m4v"}
 
 
+class VideoSourceError(Exception):
+    pass
+
+
 def load_config() -> dict:
     with CONFIG_PATH.open("r", encoding="utf-8") as f:
         return json.load(f)
@@ -315,7 +319,10 @@ def make_video_scene(
     size: Tuple[int, int],
     fade_seconds: float,
 ):
-    clip = VideoFileClip(str(path))
+    try:
+        clip = VideoFileClip(str(path))
+    except (OSError, ValueError) as exc:
+        raise VideoSourceError(str(exc)) from exc
     if clip.duration >= duration:
         clip = clip.subclipped(0, duration)
     else:
@@ -362,7 +369,7 @@ def build_video():
                 if source.exists():
                     try:
                         clip = make_video_scene(source, duration, caption, size, fade_seconds)
-                    except Exception:
+                    except VideoSourceError:
                         print(f"[안내] 영상 열기 실패: {source.name} -> 임시 장면으로 대체")
                         clip = make_image_scene(source, duration, caption, zoom, size, i, fade_seconds)
                 else:
