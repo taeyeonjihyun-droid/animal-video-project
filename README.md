@@ -47,13 +47,15 @@ animal_trip_video_project/
 
 휴대폰에서도 가능합니다.
 
-1. 이 프로젝트 전체를 GitHub 저장소에 업로드합니다.
-2. `assets/images/` 안에 자신의 장면 이미지 8장을 넣습니다.
-3. 필요하면 `assets/audio/bgm.mp3`를 넣습니다.
-4. GitHub 저장소의 **Actions** 메뉴를 엽니다.
-5. **Render animal trip video**를 선택합니다.
-6. **Run workflow**를 누릅니다.
-7. 작업 완료 후 `animal-trip-video` 아티팩트를 받습니다.
+1. `config.json`, `assets/` 등 렌더링에 필요한 파일을 수정한 뒤 **반드시 커밋/푸시**합니다.
+2. GitHub 저장소 상단에서 **Actions** 탭을 엽니다.
+3. 왼쪽 워크플로 목록에서 **Render animal video (수동 실행)** 을 클릭합니다.
+4. 오른쪽에서 **Run workflow** 버튼을 누르고 실행할 브랜치를 확인한 뒤 다시 **Run workflow**를 누릅니다.
+5. 실행이 끝나면 해당 run 상세 화면의 **Artifacts** 섹션에서 **rendered-animal-video**를 다운로드합니다.
+
+참고:
+- 실행 시간은 장면 수/길이에 따라 보통 몇 분 정도 걸릴 수 있습니다.
+- 워크플로는 저장소에 커밋된 `config.json`과 에셋 파일 기준으로 렌더링합니다.
 
 ## 2. PC에서 실행
 

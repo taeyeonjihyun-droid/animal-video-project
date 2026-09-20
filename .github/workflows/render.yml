@@ -1,11 +1,15 @@
-name: Render animal trip video
+name: Render animal video (수동 실행)
 
 on:
   workflow_dispatch:
 
+concurrency:
+  group: render-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   render:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
 
     steps:
@@ -30,10 +34,20 @@ jobs:
       - name: Render video
         run: python main.py
 
+      - name: Check rendered videos
+        run: |
+          shopt -s nullglob
+          files=(output/*.mp4)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "output/ 폴더에서 렌더링된 MP4를 찾지 못했습니다."
+            exit 1
+          fi
+          printf "렌더링 결과:\n%s\n" "${files[@]}"
+
       - name: Upload rendered video
         uses: actions/upload-artifact@v4
         with:
-          name: animal-trip-video
-          path: output/animal_trip.mp4
-          if-no-files-found: error
+          name: rendered-animal-video
+          path: output/*.mp4
+          if-no-files-found: warn
           retention-days: 7
