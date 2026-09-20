@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import copy
 import json
 import math
 from pathlib import Path
@@ -28,6 +29,34 @@ def load_config() -> dict:
         return json.load(f)
 
 
+def load_json(path: Path) -> dict:
+    with path.open("r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def resolve_repo_relative_path(path_value: str, *, must_exist: bool, allow_parent_create: bool = False) -> Path:
+    rel = Path(path_value)
+    if rel.is_absolute():
+        raise ValueError("경로는 프로젝트 상대 경로로 입력해야 합니다.")
+    if ".." in rel.parts:
+        raise ValueError("경로에 상위 디렉터리(..)를 사용할 수 없습니다.")
+
+    target = ROOT / rel
+    if allow_parent_create:
+        target.parent.mkdir(parents=True, exist_ok=True)
+
+    resolved_target = target.resolve()
+    resolved_root = ROOT.resolve()
+    try:
+        resolved_target.relative_to(resolved_root)
+    except ValueError:
+        raise ValueError("경로는 프로젝트 폴더 내부여야 합니다.")
+
+    if must_exist and not resolved_target.exists():
+        raise ValueError(f"파일을 찾을 수 없습니다: {path_value}")
+    return resolved_target
+
+
 def parse_args() -> argparse.Namespace:
     """Parse CLI flags and return an argparse.Namespace for execution mode selection."""
     parser = argparse.ArgumentParser(description="Animal video renderer / scene prompt generator")
@@ -42,9 +71,24 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="프롬프트 JSON 출력 경로 (기본: output/scene_image_prompts.json)",
     )
+    parser.add_argument(
+        "--batch-render",
+        action="store_true",
+        help="배치 설정 파일을 읽어 여러 편 영상을 순차 렌더링합니다.",
+    )
+    parser.add_argument(
+        "--batch-file",
+        type=str,
+        default=None,
+        help="배치 설정 JSON 경로 (기본: batch_config.json)",
+    )
     args = parser.parse_args()
     if args.prompts_output and not args.generate_image_prompts:
         parser.error("--prompts-output는 --generate-image-prompts와 함께 사용해야 합니다.")
+    if args.batch_file and not args.batch_render:
+        parser.error("--batch-file은 --batch-render와 함께 사용해야 합니다.")
+    if args.batch_render and args.generate_image_prompts:
+        parser.error("--batch-render와 --generate-image-prompts는 동시에 사용할 수 없습니다.")
     return args
 
 
@@ -115,25 +159,18 @@ def generate_image_prompts(output_override: str | None = None) -> None:
             }
         )
 
-    selected_output = Path(
+    selected_output = (
         output_override
         if output_override
         else cfg.get("image_prompt_output", "output/scene_image_prompts.json")
     )
-    if selected_output.is_absolute():
-        raise ValueError("프롬프트 출력 경로는 프로젝트 상대 경로로 입력해야 합니다.")
-    if ".." in selected_output.parts:
-        raise ValueError("프롬프트 출력 경로에 상위 디렉터리(..)를 사용할 수 없습니다.")
-
-    out = ROOT / selected_output
-    out.parent.mkdir(parents=True, exist_ok=True)
-    resolved_out = out.resolve()
-    resolved_root = ROOT.resolve()
-    try:
-        resolved_out.relative_to(resolved_root)
-    except ValueError:
-        raise ValueError("프롬프트 출력 경로는 프로젝트 폴더 내부여야 합니다.")
-    out = resolved_out
+    if not isinstance(selected_output, str) or not selected_output.strip():
+        raise ValueError("프롬프트 출력 경로는 비어 있을 수 없습니다.")
+    out = resolve_repo_relative_path(
+        selected_output,
+        must_exist=False,
+        allow_parent_create=True,
+    )
     payload = {
         "project_title": project_title,
         "subtitle": subtitle,
@@ -378,6 +415,10 @@ def make_video_scene(
 
 def build_video():
     cfg = load_config()
+    build_video_from_config(cfg)
+
+
+def build_video_from_config(cfg: dict) -> None:
     vcfg = cfg["video"]
     size = (int(vcfg["width"]), int(vcfg["height"]))
     fps = int(vcfg.get("fps", 30))
@@ -438,9 +479,43 @@ def build_video():
     print(f"[완료] {out}")
 
 
+def build_batch_videos(batch_file_override: str | None = None) -> None:
+    batch_file = batch_file_override or "batch_config.json"
+    batch_path = resolve_repo_relative_path(batch_file, must_exist=True)
+    batch_cfg = load_json(batch_path)
+    jobs = batch_cfg.get("jobs")
+    if not isinstance(jobs, list) or not jobs:
+        raise ValueError("배치 설정 파일에는 1개 이상의 jobs 목록이 필요합니다.")
+
+    print(f"[배치 시작] {batch_path} / 총 {len(jobs)}개")
+    for index, job in enumerate(jobs, start=1):
+        if not isinstance(job, dict):
+            raise ValueError(f"jobs[{index}]는 객체(dict)여야 합니다.")
+        config_rel = job.get("config")
+        if not isinstance(config_rel, str) or not config_rel.strip():
+            raise ValueError(f"jobs[{index}].config는 필수 문자열입니다.")
+
+        config_path = resolve_repo_relative_path(config_rel, must_exist=True)
+        cfg = load_json(config_path)
+        overrides = job.get("overrides", {})
+        if overrides:
+            if not isinstance(overrides, dict):
+                raise ValueError(f"jobs[{index}].overrides는 객체(dict)여야 합니다.")
+            merged = copy.deepcopy(cfg)
+            merged.update(overrides)
+            cfg = merged
+
+        name = str(job.get("name", f"batch-{index:02d}"))
+        print(f"[배치 작업 {index}/{len(jobs)}] {name} ({config_path})")
+        build_video_from_config(cfg)
+    print("[배치 완료] 모든 영상 렌더링이 끝났습니다.")
+
+
 if __name__ == "__main__":
     args = parse_args()
-    if args.generate_image_prompts:
+    if args.batch_render:
+        build_batch_videos(args.batch_file)
+    elif args.generate_image_prompts:
         generate_image_prompts(args.prompts_output)
     else:
         build_video()

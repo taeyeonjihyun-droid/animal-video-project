@@ -146,6 +146,40 @@ GitHub Actions에서도 동일하게 생성할 수 있습니다.
 2. `run_mode`를 `prompts`(또는 `both`)로 선택
 3. 완료 후 **Artifacts**에서 `scene-image-prompts` 다운로드
 
+## 7. 쇼츠 배치 생성 (여러 편 자동 제작)
+
+여러 개의 설정 파일을 한 번에 순차 렌더링할 수 있습니다.
+
+1) 프로젝트 루트에 배치 설정 파일(예: `batch_config.json`)을 만듭니다.
+
+```json
+{
+  "jobs": [
+    {
+      "name": "beach-episode-1",
+      "config": "config.json"
+    },
+    {
+      "name": "beach-episode-2",
+      "config": "configs/episode2.json",
+      "overrides": {
+        "output": "output/episode2.mp4"
+      }
+    }
+  ]
+}
+```
+
+2) 배치 렌더링 실행:
+
+```bash
+python main.py --batch-render --batch-file batch_config.json
+```
+
+옵션:
+- `--batch-file`을 생략하면 기본값으로 `batch_config.json`을 사용합니다.
+- `overrides`는 각 작업의 설정을 덮어쓸 때 사용합니다(예: `output`, `project_title`, `subtitle`).
+
 ## 저작권 주의
 
 다른 유튜브 영상의 실제 영상/음원/자막을 그대로 복사하지 말고,  
