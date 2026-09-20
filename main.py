@@ -28,8 +28,8 @@ def load_config() -> dict:
         return json.load(f)
 
 
-def parse_args():
-    """Parse CLI flags for rendering mode and scene image prompt generation mode."""
+def parse_args() -> argparse.Namespace:
+    """Parse CLI flags and return an argparse.Namespace for execution mode selection."""
     parser = argparse.ArgumentParser(description="Animal video renderer / scene prompt generator")
     parser.add_argument(
         "--generate-image-prompts",
@@ -88,6 +88,8 @@ def generate_image_prompts(output_override: str | None = None):
     scenes = cfg.get("scenes", [])
     if not isinstance(scenes, list) or not all(isinstance(scene, dict) for scene in scenes):
         raise ValueError("config.json의 scenes는 장면 객체(dict) 목록(list)이어야 합니다.")
+    if not scenes:
+        raise ValueError("config.json의 scenes가 비어 있습니다. 최소 1개 장면이 필요합니다.")
     project_title = str(cfg.get("project_title", ""))
     subtitle = str(cfg.get("subtitle", ""))
     total = max(1, len(scenes))
