@@ -129,7 +129,9 @@ def generate_image_prompts(output_override: str | None = None) -> None:
     out.parent.mkdir(parents=True, exist_ok=True)
     resolved_out = out.resolve()
     resolved_root = ROOT.resolve()
-    if not resolved_out.is_relative_to(resolved_root):
+    try:
+        resolved_out.relative_to(resolved_root)
+    except ValueError:
         raise ValueError("프롬프트 출력 경로는 프로젝트 폴더 내부여야 합니다.")
     out = resolved_out
     payload = {

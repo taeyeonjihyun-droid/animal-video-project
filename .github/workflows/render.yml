@@ -20,7 +20,7 @@ env:
   RUN_MODE: ${{ github.event.inputs.run_mode || 'render' }}
 
 concurrency:
-  group: render-${{ github.workflow }}-${{ github.ref }}-manual
+  group: render-${{ github.workflow }}-${{ github.ref }}-${{ github.event.inputs.run_mode || 'render' }}
   cancel-in-progress: true
 
 jobs:
