@@ -114,7 +114,7 @@ jobs:
           printf "렌더링 결과:\n%s\n" "${files[@]}"
 
       - name: Check generated prompts
-        if: ${{ env.RUN_MODE == 'prompts' || env.RUN_MODE == 'both' }}
+        if: ${{ (env.RUN_MODE == 'prompts' || env.RUN_MODE == 'both') && success() }}
         run: |
           test -f output/scene_image_prompts.json
           echo "프롬프트 결과 확인: output/scene_image_prompts.json"
@@ -131,7 +131,7 @@ jobs:
           retention-days: 7
 
       - name: Upload generated prompts
-        if: ${{ env.RUN_MODE == 'prompts' || env.RUN_MODE == 'both' }}
+        if: ${{ (env.RUN_MODE == 'prompts' || env.RUN_MODE == 'both') && success() }}
         uses: actions/upload-artifact@v4
         with:
           name: scene-image-prompts
