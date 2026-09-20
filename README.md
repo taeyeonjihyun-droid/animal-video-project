@@ -112,6 +112,26 @@ Veo, Gemini, Runway, Firefly 등에서 만든 짧은 클립을 넣으면
 
 8개 장면의 `duration` 합이 60이면 1분 영상이 됩니다.
 
+## 6. 장면용 AI 이미지 프롬프트 자동 생성
+
+`config.json`의 `scenes`를 읽어서 장면별 이미지 생성 프롬프트를 자동으로 만듭니다.
+
+```bash
+python main.py --generate-image-prompts
+```
+
+생성 결과:
+
+```text
+output/scene_image_prompts.json
+```
+
+옵션으로 출력 경로를 직접 지정할 수 있습니다.
+
+```bash
+python main.py --generate-image-prompts --prompts-output output/my_prompts.json
+```
+
 ## 저작권 주의
 
 다른 유튜브 영상의 실제 영상/음원/자막을 그대로 복사하지 말고,  

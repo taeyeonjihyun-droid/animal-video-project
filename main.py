@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import json
 import math
 from pathlib import Path
@@ -25,6 +26,106 @@ CONFIG_PATH = ROOT / "config.json"
 def load_config() -> dict:
     with CONFIG_PATH.open("r", encoding="utf-8") as f:
         return json.load(f)
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="Animal video renderer / scene prompt generator")
+    parser.add_argument(
+        "--generate-image-prompts",
+        action="store_true",
+        help="config.json의 scenes를 기반으로 AI 이미지 프롬프트를 생성합니다.",
+    )
+    parser.add_argument(
+        "--prompts-output",
+        type=str,
+        default=None,
+        help="프롬프트 JSON 출력 경로 (기본: output/scene_image_prompts.json)",
+    )
+    return parser.parse_args()
+
+
+def aspect_ratio_label(width: int, height: int) -> str:
+    g = math.gcd(width, height)
+    return f"{width//g}:{height//g}"
+
+
+def build_scene_prompt(
+    scene: dict,
+    scene_index: int,
+    total_scenes: int,
+    project_title: str,
+    subtitle: str,
+    width: int,
+    height: int,
+) -> str:
+    caption = str(scene.get("caption", "")).strip()
+    source = Path(str(scene.get("source", ""))).stem.replace("_", " ").strip()
+    ratio = aspect_ratio_label(width, height)
+    details = caption if caption else f"scene concept: {source or f'scene {scene_index}'}"
+
+    return (
+        f"Korean animation style, bright family-friendly colors, cinematic composition, "
+        f"consistent characters (puppy, cat, panda, rabbit), scene {scene_index}/{total_scenes}. "
+        f"Story title: {project_title}. Subtitle context: {subtitle}. "
+        f"Visual direction: {details}. "
+        f"high detail, clean background separation, soft lighting, no text, no logo, no watermark, "
+        f"aspect ratio {ratio} ({width}x{height})."
+    )
+
+
+def generate_image_prompts(output_override: str | None = None):
+    cfg = load_config()
+    vcfg = cfg.get("video", {})
+    width = int(vcfg.get("width", 1280))
+    height = int(vcfg.get("height", 720))
+
+    scenes = cfg.get("scenes", [])
+    project_title = str(cfg.get("project_title", ""))
+    subtitle = str(cfg.get("subtitle", ""))
+    total = max(1, len(scenes))
+
+    prompt_items = []
+    for i, scene in enumerate(scenes, start=1):
+        prompt_items.append(
+            {
+                "scene_index": i,
+                "source": scene.get("source", ""),
+                "caption": scene.get("caption", ""),
+                "duration": scene.get("duration", 7.5),
+                "prompt": build_scene_prompt(
+                    scene=scene,
+                    scene_index=i,
+                    total_scenes=total,
+                    project_title=project_title,
+                    subtitle=subtitle,
+                    width=width,
+                    height=height,
+                ),
+                "negative_prompt": "blurry, low quality, noisy, distorted anatomy, deformed face, extra limbs, text, logo, watermark",
+            }
+        )
+
+    out = ROOT / (
+        output_override
+        if output_override
+        else cfg.get("image_prompt_output", "output/scene_image_prompts.json")
+    )
+    out.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "project_title": project_title,
+        "subtitle": subtitle,
+        "aspect_ratio": aspect_ratio_label(width, height),
+        "resolution": {"width": width, "height": height},
+        "scene_prompt_count": len(prompt_items),
+        "scene_prompts": prompt_items,
+    }
+
+    with out.open("w", encoding="utf-8") as f:
+        json.dump(payload, f, ensure_ascii=False, indent=2)
+
+    print(f"[완료] 장면 프롬프트 저장: {out}")
+    for item in prompt_items:
+        print(f"- Scene {item['scene_index']:02d}: {item['prompt']}")
 
 
 def find_font(bold: bool = True) -> str | None:
@@ -315,4 +416,8 @@ def build_video():
 
 
 if __name__ == "__main__":
-    build_video()
+    args = parse_args()
+    if args.generate_image_prompts:
+        generate_image_prompts(args.prompts_output)
+    else:
+        build_video()
