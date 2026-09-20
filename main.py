@@ -57,6 +57,20 @@ def resolve_repo_relative_path(path_value: str, *, must_exist: bool, allow_paren
     return resolved_target
 
 
+def deep_merge_dict(base: dict, overrides: dict) -> dict:
+    merged = copy.deepcopy(base)
+    for key, value in overrides.items():
+        if (
+            key in merged
+            and isinstance(merged[key], dict)
+            and isinstance(value, dict)
+        ):
+            merged[key] = deep_merge_dict(merged[key], value)
+        else:
+            merged[key] = value
+    return merged
+
+
 def parse_args() -> argparse.Namespace:
     """Parse CLI flags and return an argparse.Namespace for execution mode selection."""
     parser = argparse.ArgumentParser(description="Animal video renderer / scene prompt generator")
@@ -501,9 +515,7 @@ def build_batch_videos(batch_file_override: str | None = None) -> None:
         if overrides:
             if not isinstance(overrides, dict):
                 raise ValueError(f"jobs[{index}].overrides는 객체(dict)여야 합니다.")
-            merged = copy.deepcopy(cfg)
-            merged.update(overrides)
-            cfg = merged
+            cfg = deep_merge_dict(cfg, overrides)
 
         name = str(job.get("name", f"batch-{index:02d}"))
         print(f"[배치 작업 {index}/{len(jobs)}] {name} ({config_path})")
