@@ -199,7 +199,7 @@ def generate_image_prompts_from_config(
         raise ValueError("프롬프트 출력 경로는 비어 있을 수 없습니다.")
     out = resolve_repo_relative_path(
         selected_output,
-        base_dir=ROOT,
+        base_dir=Path.cwd().resolve() if output_override else ROOT,
         must_exist=False,
         allow_parent_create=True,
     )

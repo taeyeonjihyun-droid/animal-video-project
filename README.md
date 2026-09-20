@@ -138,7 +138,7 @@ output/scene_image_prompts.json
 python main.py --generate-image-prompts --prompts-output output/my_prompts.json
 ```
 
-`--prompts-output` 경로는 프로젝트 폴더 내부 경로만 사용할 수 있습니다(상대/절대 모두 가능).
+`--prompts-output` 경로는 프로젝트 폴더 내부 경로만 사용할 수 있습니다(상대 경로는 실행 위치 기준, 절대 경로도 가능).
 
 GitHub Actions에서도 동일하게 생성할 수 있습니다.
 
