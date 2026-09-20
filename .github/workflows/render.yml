@@ -16,8 +16,11 @@ on:
 permissions:
   contents: read
 
+env:
+  RUN_MODE: ${{ inputs.run_mode || 'render' }}
+
 concurrency:
-  group: render-${{ github.workflow }}-${{ github.ref }}-${{ inputs.run_mode || 'render' }}
+  group: render-${{ github.workflow }}-${{ github.ref }}-${{ env.RUN_MODE }}
   cancel-in-progress: true
 
 jobs:
@@ -50,15 +53,15 @@ jobs:
           find output -mindepth 1 ! -name ".gitkeep" -delete
 
       - name: Generate scene prompts
-        if: ${{ inputs.run_mode == 'prompts' || inputs.run_mode == 'both' }}
+        if: ${{ env.RUN_MODE == 'prompts' || env.RUN_MODE == 'both' }}
         run: python main.py --generate-image-prompts --prompts-output output/scene_image_prompts.json
 
       - name: Render video
-        if: ${{ inputs.run_mode == 'render' || inputs.run_mode == 'both' }}
+        if: ${{ env.RUN_MODE == 'render' || env.RUN_MODE == 'both' }}
         run: python main.py
 
       - name: Check rendered videos
-        if: ${{ inputs.run_mode == 'render' || inputs.run_mode == 'both' }}
+        if: ${{ env.RUN_MODE == 'render' || env.RUN_MODE == 'both' }}
         shell: bash
         run: |
           shopt -s nullglob
@@ -70,13 +73,13 @@ jobs:
           printf "렌더링 결과:\n%s\n" "${files[@]}"
 
       - name: Check generated prompts
-        if: ${{ inputs.run_mode == 'prompts' || inputs.run_mode == 'both' }}
+        if: ${{ env.RUN_MODE == 'prompts' || env.RUN_MODE == 'both' }}
         run: |
           test -f output/scene_image_prompts.json
           echo "프롬프트 결과 확인: output/scene_image_prompts.json"
 
       - name: Upload rendered video
-        if: ${{ inputs.run_mode == 'render' || inputs.run_mode == 'both' }}
+        if: ${{ env.RUN_MODE == 'render' || env.RUN_MODE == 'both' }}
         uses: actions/upload-artifact@v4
         with:
           name: rendered-animal-video
@@ -85,7 +88,7 @@ jobs:
           retention-days: 7
 
       - name: Upload generated prompts
-        if: ${{ inputs.run_mode == 'prompts' || inputs.run_mode == 'both' }}
+        if: ${{ env.RUN_MODE == 'prompts' || env.RUN_MODE == 'both' }}
         uses: actions/upload-artifact@v4
         with:
           name: scene-image-prompts
