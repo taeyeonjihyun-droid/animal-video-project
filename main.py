@@ -526,6 +526,7 @@ def build_batch_videos(batch_file_override: str | None = None) -> None:
         raise ValueError("배치 설정 파일에는 1개 이상의 jobs 목록이 필요합니다.")
 
     print(f"[배치 시작] {batch_path} / 총 {len(jobs)}개")
+    total_jobs = len(jobs)
     for index, job in enumerate(jobs, start=1):
         if not isinstance(job, dict):
             raise ValueError(f"jobs[{index}]는 객체(dict)여야 합니다.")
@@ -545,6 +546,11 @@ def build_batch_videos(batch_file_override: str | None = None) -> None:
             raise ValueError(f"jobs[{index}].overrides는 객체(dict)여야 합니다.")
         if isinstance(overrides, dict) and overrides:
             cfg = deep_merge_dict(cfg, overrides)
+        if total_jobs > 1 and not (isinstance(overrides, dict) and "output" in overrides):
+            base_output = Path(str(cfg.get("output", "output/animal_trip.mp4")))
+            suffix = base_output.suffix or ".mp4"
+            stem = base_output.stem or "animal_trip"
+            cfg["output"] = str(base_output.with_name(f"{stem}_{index:02d}{suffix}"))
 
         name = str(job.get("name", f"batch-{index:02d}"))
         print(f"[배치 작업 {index}/{len(jobs)}] {name} ({config_path})")

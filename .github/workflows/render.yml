@@ -74,10 +74,10 @@ jobs:
         if: ${{ env.RUN_MODE == 'render' || env.RUN_MODE == 'both' || env.RUN_MODE == 'batch' }}
         shell: bash
         run: |
-          shopt -s nullglob
-          files=(output/*.mp4)
+          shopt -s globstar nullglob
+          files=(output/**/*.mp4)
           if [ ${#files[@]} -eq 0 ]; then
-            echo "output/ 폴더에서 렌더링된 MP4를 찾지 못했습니다."
+            echo "output/ 하위에서 렌더링된 MP4를 찾지 못했습니다."
             exit 1
           fi
           printf "렌더링 결과:\n%s\n" "${files[@]}"
@@ -93,7 +93,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: rendered-animal-video
-          path: output/*.mp4
+          path: output/**/*.mp4
           if-no-files-found: error
           retention-days: 7
 
