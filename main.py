@@ -359,9 +359,11 @@ def build_video():
             zoom = float(scene.get("zoom", 1.04))
 
             if source.suffix.lower() in VIDEO_EXTENSIONS:
-                if not source.exists():
-                    raise FileNotFoundError(f"{i}번 장면 영상 파일을 찾을 수 없습니다: {source}")
-                clip = make_video_scene(source, duration, caption, size, fade_seconds)
+                if source.exists():
+                    clip = make_video_scene(source, duration, caption, size, fade_seconds)
+                else:
+                    print(f"[안내] 영상 없음: {source.name} -> 임시 장면으로 대체")
+                    clip = make_image_scene(source, duration, caption, zoom, size, i, fade_seconds)
             else:
                 clip = make_image_scene(source, duration, caption, zoom, size, i, fade_seconds)
             clips.append(clip)
