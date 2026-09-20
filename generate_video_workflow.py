@@ -195,7 +195,7 @@ def import_runway_submission_errors():
     try:
         from runwayml import RunwayMLError, TaskFailedError, TaskTimeoutError
     except ImportError:
-        return ()
+        return None
     return (RunwayMLError, TaskFailedError, TaskTimeoutError)
 
 
@@ -244,11 +244,17 @@ def resolve_runway_duration_for_shot(shot: dict[str, Any], override: str | int |
 
 def serialize_runway_task(task: Any) -> dict[str, Any]:
     if hasattr(task, "model_dump"):
-        payload = task.model_dump()
+        try:
+            payload = task.model_dump()
+        except Exception:
+            payload = None
         if isinstance(payload, dict):
             return payload
     if hasattr(task, "to_dict"):
-        payload = task.to_dict()
+        try:
+            payload = task.to_dict()
+        except Exception:
+            payload = None
         if isinstance(payload, dict):
             return payload
     return {"id": getattr(task, "id", None)}
@@ -368,19 +374,25 @@ class RunwayAdapter(ProviderAdapter):
             }
             if self.generation_mode == "image_to_video":
                 create_kwargs["prompt_image"] = prompt_image
-                try:
+                if runway_errors:
+                    try:
+                        task = client.image_to_video.create(**create_kwargs)
+                    except runway_errors as exc:
+                        raise RuntimeError(
+                            f"Runway submission failed for shot {shot['id']}: {exc}"
+                        ) from exc
+                else:
                     task = client.image_to_video.create(**create_kwargs)
-                except runway_errors as exc:
-                    raise RuntimeError(
-                        f"Runway submission failed for shot {shot['id']}: {exc}"
-                    ) from exc
             else:
-                try:
+                if runway_errors:
+                    try:
+                        task = client.text_to_video.create(**create_kwargs)
+                    except runway_errors as exc:
+                        raise RuntimeError(
+                            f"Runway submission failed for shot {shot['id']}: {exc}"
+                        ) from exc
+                else:
                     task = client.text_to_video.create(**create_kwargs)
-                except runway_errors as exc:
-                    raise RuntimeError(
-                        f"Runway submission failed for shot {shot['id']}: {exc}"
-                    ) from exc
 
             tasks.append(
                 {

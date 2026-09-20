@@ -201,6 +201,11 @@ class GenerateVideoWorkflowTests(unittest.TestCase):
         package = build_scene_package(self.spec)
         self.assertEqual(resolve_runway_ratio(package), "720:1280")
 
+    @patch.dict("os.environ", {"RUNWAY_RATIO": "invalid-ratio"}, clear=True)
+    def test_resolve_runway_ratio_preserves_explicit_override(self):
+        package = build_scene_package(self.spec)
+        self.assertEqual(resolve_runway_ratio(package), "invalid-ratio")
+
     @patch.dict("os.environ", {}, clear=True)
     def test_resolve_runway_ratio_maps_supported_aspect_ratios(self):
         tall_package = build_scene_package({**self.spec, "aspect_ratio": "9:16"})
