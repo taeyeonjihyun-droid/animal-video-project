@@ -420,16 +420,17 @@ def build_video():
         )
         print(f"[완료] {out}")
     finally:
-        if title is not None:
-            title.close()
-        if bgm is not None:
-            bgm.close()
-        if bgm_source is not None:
-            bgm_source.close()
         if final is not None:
             final.close()
-        for clip in clips:
-            clip.close()
+        else:
+            if title is not None:
+                title.close()
+            if bgm is not None:
+                bgm.close()
+            if bgm_source is not None:
+                bgm_source.close()
+            for clip in clips:
+                clip.close()
 
 
 if __name__ == "__main__":
