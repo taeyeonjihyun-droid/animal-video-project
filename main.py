@@ -77,6 +77,13 @@ def deep_merge_dict(base: dict, overrides: dict) -> dict:
     return merged
 
 
+def with_batch_index_suffix(output_path: str, index: int) -> str:
+    base_output = Path(output_path)
+    suffix = base_output.suffix or ".mp4"
+    stem = base_output.stem or "animal_trip"
+    return str(base_output.with_name(f"{stem}_{index:02d}{suffix}"))
+
+
 def parse_args() -> argparse.Namespace:
     """Parse CLI flags and return an argparse.Namespace for execution mode selection."""
     parser = argparse.ArgumentParser(description="Animal video renderer / scene prompt generator")
@@ -550,10 +557,7 @@ def build_batch_videos(batch_file_override: str | None = None) -> None:
             cfg = deep_merge_dict(cfg, overrides)
         effective_output_value = str(cfg.get("output", "output/animal_trip.mp4"))
         if total_jobs > 1 and not has_output_override and effective_output_value == base_output_value:
-            base_output = Path(effective_output_value)
-            suffix = base_output.suffix or ".mp4"
-            stem = base_output.stem or "animal_trip"
-            cfg["output"] = str(base_output.with_name(f"{stem}_{index:02d}{suffix}"))
+            cfg["output"] = with_batch_index_suffix(effective_output_value, index)
 
         name = str(job.get("name", f"batch-{index:02d}"))
         print(f"[배치 작업 {index}/{len(jobs)}] {name} ({config_path})")
