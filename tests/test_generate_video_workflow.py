@@ -381,9 +381,8 @@ class GenerateVideoWorkflowTests(unittest.TestCase):
         )
 
         with tempfile.TemporaryDirectory() as temp_dir:
-            with patch("generate_video_workflow.import_runway_submission_errors", return_value=(RuntimeError,)):
-                with self.assertRaisesRegex(RuntimeError, "Runway submission failed for shot shot_01"):
-                    adapter.run(package, Path(temp_dir))
+            with self.assertRaisesRegex(RuntimeError, "Runway submission failed for shot shot_01"):
+                adapter.run(package, Path(temp_dir))
 
 
 if __name__ == "__main__":
