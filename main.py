@@ -91,7 +91,7 @@ def parse_args() -> argparse.Namespace:
         "--prompts-output",
         type=str,
         default=None,
-        help="프롬프트 JSON 출력 경로 (기본: output/scene_image_prompts.json)",
+        help="프롬프트 JSON 출력 경로 (프로젝트 루트 기준 상대 경로, 기본: output/scene_image_prompts.json)",
     )
     parser.add_argument(
         "--batch-render",
@@ -102,7 +102,7 @@ def parse_args() -> argparse.Namespace:
         "--batch-file",
         type=str,
         default=None,
-        help="배치 설정 JSON 경로 (기본: batch_config.json)",
+        help="배치 설정 JSON 경로 (현재 작업 디렉터리 기준 상대 경로, 기본: batch_config.json)",
     )
     args = parser.parse_args()
     if args.prompts_output and not args.generate_image_prompts:
@@ -515,7 +515,11 @@ def build_video_from_config(cfg: dict) -> None:
 
 def build_batch_videos(batch_file_override: str | None = None) -> None:
     batch_file = batch_file_override or "batch_config.json"
-    batch_path = resolve_repo_relative_path(batch_file, base_dir=ROOT, must_exist=True)
+    batch_path = resolve_repo_relative_path(
+        batch_file,
+        base_dir=Path.cwd().resolve(),
+        must_exist=True,
+    )
     batch_cfg = load_json(batch_path)
     if not isinstance(batch_cfg, dict):
         raise ValueError("배치 설정 파일 최상위는 객체(dict)여야 합니다.")
@@ -537,10 +541,11 @@ def build_batch_videos(batch_file_override: str | None = None) -> None:
             must_exist=True,
         )
         cfg = load_config_from_path(config_path)
+        has_overrides = "overrides" in job
         overrides = job.get("overrides", {})
-        if overrides:
-            if not isinstance(overrides, dict):
-                raise ValueError(f"jobs[{index}].overrides는 객체(dict)여야 합니다.")
+        if has_overrides and not isinstance(overrides, dict):
+            raise ValueError(f"jobs[{index}].overrides는 객체(dict)여야 합니다.")
+        if isinstance(overrides, dict) and overrides:
             cfg = deep_merge_dict(cfg, overrides)
 
         name = str(job.get("name", f"batch-{index:02d}"))
