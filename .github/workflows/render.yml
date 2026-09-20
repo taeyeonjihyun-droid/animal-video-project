@@ -2,6 +2,16 @@ name: Render animal video (수동 실행)
 
 on:
   workflow_dispatch:
+    inputs:
+      run_mode:
+        description: "실행 모드 선택"
+        required: false
+        default: "render"
+        type: choice
+        options:
+          - render
+          - prompts
+          - both
 
 permissions:
   contents: read
@@ -39,10 +49,16 @@ jobs:
           mkdir -p output
           find output -mindepth 1 ! -name ".gitkeep" -delete
 
+      - name: Generate scene prompts
+        if: ${{ inputs.run_mode == 'prompts' || inputs.run_mode == 'both' }}
+        run: python main.py --generate-image-prompts
+
       - name: Render video
+        if: ${{ inputs.run_mode == 'render' || inputs.run_mode == 'both' }}
         run: python main.py
 
       - name: Check rendered videos
+        if: ${{ inputs.run_mode == 'render' || inputs.run_mode == 'both' }}
         shell: bash
         run: |
           shopt -s nullglob
@@ -53,10 +69,26 @@ jobs:
           fi
           printf "렌더링 결과:\n%s\n" "${files[@]}"
 
+      - name: Check generated prompts
+        if: ${{ inputs.run_mode == 'prompts' || inputs.run_mode == 'both' }}
+        run: |
+          test -f output/scene_image_prompts.json
+          echo "프롬프트 결과 확인: output/scene_image_prompts.json"
+
       - name: Upload rendered video
+        if: ${{ inputs.run_mode == 'render' || inputs.run_mode == 'both' }}
         uses: actions/upload-artifact@v4
         with:
           name: rendered-animal-video
           path: output/*.mp4
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload generated prompts
+        if: ${{ inputs.run_mode == 'prompts' || inputs.run_mode == 'both' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: scene-image-prompts
+          path: output/scene_image_prompts.json
           if-no-files-found: error
           retention-days: 7

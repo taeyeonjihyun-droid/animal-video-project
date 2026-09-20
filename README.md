@@ -50,8 +50,14 @@ animal_trip_video_project/
 1. `config.json`, `assets/` 등 렌더링에 필요한 파일을 수정한 뒤 **반드시 커밋/푸시**합니다.
 2. GitHub 저장소 상단에서 **Actions** 탭을 엽니다.
 3. 왼쪽 워크플로 목록에서 **Render animal video (수동 실행)** 을 클릭합니다.
-4. 오른쪽에서 **Run workflow** 버튼을 누르고 실행할 브랜치를 확인한 뒤 다시 **Run workflow**를 누릅니다.
-5. 실행이 끝나면 해당 run 상세 화면의 **Artifacts** 섹션에서 **rendered-animal-video**를 다운로드합니다.
+4. 오른쪽에서 **Run workflow** 버튼을 누른 뒤 `run_mode`를 선택합니다.
+   - `render`: 영상 렌더링(MP4)
+   - `prompts`: 장면 프롬프트 JSON 생성
+   - `both`: 프롬프트 생성 + 영상 렌더링
+5. 실행할 브랜치를 확인하고 **Run workflow**를 누릅니다.
+6. 실행이 끝나면 run 상세 화면의 **Artifacts**에서 결과를 다운로드합니다.
+   - 영상: `rendered-animal-video`
+   - 프롬프트: `scene-image-prompts`
 
 참고:
 - 실행 시간은 장면 수/길이에 따라 보통 몇 분 정도 걸릴 수 있습니다.
@@ -133,6 +139,12 @@ python main.py --generate-image-prompts --prompts-output output/my_prompts.json
 ```
 
 `--prompts-output` 경로는 프로젝트 폴더 내부 경로만 사용할 수 있습니다.
+
+GitHub Actions에서도 동일하게 생성할 수 있습니다.
+
+1. **Actions** → **Render animal video (수동 실행)** → **Run workflow**
+2. `run_mode`를 `prompts`(또는 `both`)로 선택
+3. 완료 후 **Artifacts**에서 `scene-image-prompts` 다운로드
 
 ## 저작권 주의
 
