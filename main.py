@@ -360,7 +360,11 @@ def build_video():
 
             if source.suffix.lower() in VIDEO_EXTENSIONS:
                 if source.exists():
-                    clip = make_video_scene(source, duration, caption, size, fade_seconds)
+                    try:
+                        clip = make_video_scene(source, duration, caption, size, fade_seconds)
+                    except Exception:
+                        print(f"[안내] 영상 열기 실패: {source.name} -> 임시 장면으로 대체")
+                        clip = make_image_scene(source, duration, caption, zoom, size, i, fade_seconds)
                 else:
                     print(f"[안내] 영상 없음: {source.name} -> 임시 장면으로 대체")
                     clip = make_image_scene(source, duration, caption, zoom, size, i, fade_seconds)

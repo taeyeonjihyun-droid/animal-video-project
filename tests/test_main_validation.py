@@ -45,6 +45,9 @@ class MainValidationTests(unittest.TestCase):
         lines = wrap_text(draw, text, font=font, max_width=300, stroke_width=2, max_lines=3)
         self.assertGreaterEqual(len(lines), 2)
         self.assertTrue(all(lines))
+        for line in lines:
+            line_width = draw.textbbox((0, 0), line, font=font, stroke_width=2)[2]
+            self.assertLessEqual(line_width, 300)
 
     def test_wrap_text_truncates_with_ellipsis(self):
         image = Image.new("RGBA", (1080, 1920), (0, 0, 0, 0))
