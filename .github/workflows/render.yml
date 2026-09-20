@@ -103,7 +103,7 @@ jobs:
           retention-days: 7
 
       - name: Check rendered videos
-        if: ${{ env.RUN_MODE == 'render' || env.RUN_MODE == 'both' || env.RUN_MODE == 'batch' }}
+        if: ${{ (env.RUN_MODE == 'render' || env.RUN_MODE == 'both' || env.RUN_MODE == 'batch') && success() }}
         shell: bash
         run: |
           mapfile -t files < <(find output -type f -name '*.mp4')

@@ -548,7 +548,6 @@ def build_batch_videos(batch_file_override: str | None = None) -> None:
             must_exist=True,
         )
         cfg = load_config_from_path(config_path)
-        base_output_value = str(cfg.get("output", "output/animal_trip.mp4"))
         has_overrides = "overrides" in job
         overrides = job.get("overrides", {})
         if has_overrides and not isinstance(overrides, dict):
@@ -558,14 +557,13 @@ def build_batch_videos(batch_file_override: str | None = None) -> None:
             cfg = deep_merge_dict(cfg, overrides)
         effective_output_value = str(cfg.get("output", "output/animal_trip.mp4"))
         final_output_value = effective_output_value
-        if total_jobs > 1 and not has_output_override and effective_output_value == base_output_value:
-            if final_output_value in used_outputs:
-                suffix_index = index
+        if total_jobs > 1 and final_output_value in used_outputs:
+            suffix_index = index
+            candidate = with_batch_index_suffix(effective_output_value, suffix_index)
+            while candidate in used_outputs:
+                suffix_index += 1
                 candidate = with_batch_index_suffix(effective_output_value, suffix_index)
-                while candidate in used_outputs:
-                    suffix_index += 1
-                    candidate = with_batch_index_suffix(effective_output_value, suffix_index)
-                final_output_value = candidate
+            final_output_value = candidate
         cfg["output"] = final_output_value
         used_outputs.add(final_output_value)
 
