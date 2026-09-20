@@ -1,9 +1,14 @@
+import io
+import tempfile
 import unittest
 from copy import deepcopy
 from pathlib import Path
+from unittest.mock import patch
+from urllib import error
 
 from generate_video_workflow import (
     DEFAULT_SCENE_SPEC,
+    GenericWebhookAdapter,
     build_scene_package,
     build_shot_prompt,
     decode_provider_response,
@@ -99,6 +104,59 @@ class GenerateVideoWorkflowTests(unittest.TestCase):
             decode_provider_response('"job-12345"'),
             {"parsed_response": "job-12345"},
         )
+
+    def test_generic_webhook_adapter_persists_plain_text_success(self):
+        adapter = GenericWebhookAdapter("https://example.test/generate", "token", 30)
+        package = build_scene_package(self.spec)
+
+        class FakeResponse:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, tb):
+                return False
+
+            def read(self):
+                return b"job-12345"
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with patch("generate_video_workflow.request.urlopen", return_value=FakeResponse()):
+                result = adapter.run(package, Path(temp_dir))
+
+            self.assertEqual(result["status"], "submitted")
+            response_path = Path(result["response_payload"])
+            self.assertEqual(
+                load_scene_spec(response_path),
+                {"raw_response": "job-12345"},
+            )
+
+    def test_generic_webhook_adapter_surfaces_http_error(self):
+        adapter = GenericWebhookAdapter("https://example.test/generate", None, 30)
+        package = build_scene_package(self.spec)
+        http_error = error.HTTPError(
+            url="https://example.test/generate",
+            code=400,
+            msg="Bad Request",
+            hdrs=None,
+            fp=io.BytesIO(b'{"error":"bad request"}'),
+        )
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with patch("generate_video_workflow.request.urlopen", side_effect=http_error):
+                with self.assertRaisesRegex(RuntimeError, "HTTP 400"):
+                    adapter.run(package, Path(temp_dir))
+
+    def test_generic_webhook_adapter_surfaces_url_error(self):
+        adapter = GenericWebhookAdapter("https://example.test/generate", None, 30)
+        package = build_scene_package(self.spec)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with patch(
+                "generate_video_workflow.request.urlopen",
+                side_effect=error.URLError("connection refused"),
+            ):
+                with self.assertRaisesRegex(RuntimeError, "connection refused"):
+                    adapter.run(package, Path(temp_dir))
 
 
 if __name__ == "__main__":

@@ -62,6 +62,14 @@ def validate_scene_spec(spec: dict[str, Any]) -> None:
     total_duration = 0.0
     running_offset = 0.0
     for shot in shots:
+        missing_shot_keys = [
+            key for key in ("id", "start_seconds", "duration_seconds") if key not in shot
+        ]
+        if missing_shot_keys:
+            raise ValueError(
+                f"Each shot must include {', '.join(missing_shot_keys)}; "
+                f"missing in shot: {shot!r}"
+            )
         start_seconds = float(shot["start_seconds"])
         duration_seconds = float(shot["duration_seconds"])
         if duration_seconds <= 0:
