@@ -47,10 +47,14 @@ def validate_scene_spec(spec: dict[str, Any]) -> None:
         raise ValueError(f"Scene spec is missing required keys: {', '.join(missing)}")
 
     characters = spec["character_bible"]
+    if not isinstance(characters, list):
+        raise ValueError("Scene spec character_bible must be a list.")
     if len(characters) != 5:
         raise ValueError("Scene spec must define exactly five characters.")
 
     shots = spec["shots"]
+    if not isinstance(shots, list):
+        raise ValueError("Scene spec shots must be a list.")
     if len(shots) != 4:
         raise ValueError("Scene spec must define exactly four shots.")
 
@@ -60,6 +64,8 @@ def validate_scene_spec(spec: dict[str, Any]) -> None:
     for shot in shots:
         start_seconds = float(shot["start_seconds"])
         duration_seconds = float(shot["duration_seconds"])
+        if duration_seconds <= 0:
+            raise ValueError(f"Shot {shot['id']} must have a duration greater than 0 seconds.")
         if abs(start_seconds - running_offset) > 1e-6:
             raise ValueError(
                 f"Shot {shot['id']} must start at {running_offset} seconds, got {start_seconds}."

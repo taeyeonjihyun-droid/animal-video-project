@@ -33,6 +33,18 @@ class GenerateVideoWorkflowTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "exactly four shots"):
             validate_scene_spec(invalid_spec)
 
+    def test_scene_spec_rejects_invalid_shot_sequence(self):
+        invalid_spec = deepcopy(self.spec)
+        invalid_spec["shots"][1]["start_seconds"] = 99
+        with self.assertRaisesRegex(ValueError, "must start at"):
+            validate_scene_spec(invalid_spec)
+
+    def test_scene_spec_rejects_non_positive_shot_duration(self):
+        invalid_spec = deepcopy(self.spec)
+        invalid_spec["shots"][0]["duration_seconds"] = 0
+        with self.assertRaisesRegex(ValueError, "greater than 0 seconds"):
+            validate_scene_spec(invalid_spec)
+
     def test_scene_package_contains_four_consistent_shots(self):
         package = build_scene_package(self.spec)
 
