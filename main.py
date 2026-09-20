@@ -20,11 +20,56 @@ from moviepy import (
 
 ROOT = Path(__file__).resolve().parent
 CONFIG_PATH = ROOT / "config.json"
+VIDEO_EXTENSIONS = {".mp4", ".mov", ".mkv", ".webm", ".m4v"}
+
+
+class VideoSourceError(Exception):
+    pass
 
 
 def load_config() -> dict:
     with CONFIG_PATH.open("r", encoding="utf-8") as f:
         return json.load(f)
+
+
+def validate_config(cfg: dict) -> None:
+    if not isinstance(cfg, dict):
+        raise ValueError("설정 파일 형식이 올바르지 않습니다. JSON 객체 형태여야 합니다.")
+    if "video" not in cfg or not isinstance(cfg["video"], dict):
+        raise ValueError("`video` 설정이 없습니다. width/height/fps를 확인하세요.")
+    if "scenes" not in cfg or not isinstance(cfg["scenes"], list) or len(cfg["scenes"]) == 0:
+        raise ValueError("`scenes`가 비어 있습니다. 최소 1개 이상의 장면을 설정하세요.")
+
+    vcfg = cfg["video"]
+    try:
+        width = int(vcfg.get("width", 0))
+        height = int(vcfg.get("height", 0))
+        fps = int(vcfg.get("fps", 0))
+    except (TypeError, ValueError) as exc:
+        raise ValueError("video.width, video.height, video.fps는 숫자여야 합니다.") from exc
+    if width <= 0 or height <= 0:
+        raise ValueError("영상 크기(width/height)는 1 이상의 정수여야 합니다.")
+    if fps <= 0:
+        raise ValueError("fps는 1 이상의 정수여야 합니다.")
+
+    for i, scene in enumerate(cfg["scenes"], start=1):
+        if not isinstance(scene, dict):
+            raise ValueError(f"{i}번 장면 형식이 잘못되었습니다. 객체 형태로 입력하세요.")
+        source = scene.get("source")
+        if not source or not isinstance(source, str):
+            raise ValueError(f"{i}번 장면에 `source`가 없습니다.")
+        try:
+            duration = float(scene.get("duration", 0))
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"{i}번 장면 duration은 숫자여야 합니다.") from exc
+        if duration <= 0:
+            raise ValueError(f"{i}번 장면 duration은 0보다 커야 합니다.")
+        try:
+            zoom = float(scene.get("zoom", 1.0))
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"{i}번 장면 zoom은 숫자여야 합니다.") from exc
+        if zoom <= 0:
+            raise ValueError(f"{i}번 장면 zoom은 0보다 커야 합니다.")
 
 
 def find_font(bold: bool = True) -> str | None:
@@ -72,72 +117,103 @@ def placeholder_scene(index: int, caption: str, size: Tuple[int, int]) -> Image.
     img = Image.new("RGB", size, (base, min(180, base + 35), min(210, base + 70)))
     draw = ImageDraw.Draw(img)
 
-    # 하늘/들판 느낌의 단순 도형
-    draw.rectangle((0, int(h * 0.62), w, h), fill=(80, 135, 74))
-    draw.ellipse((int(w * 0.76), int(h * 0.08), int(w * 0.88), int(h * 0.25)), fill=(250, 220, 110))
+    # 세로 화면에서도 잘 보이도록 하단 들판 + 상단 해
+    draw.rectangle((0, int(h * 0.66), w, h), fill=(80, 135, 74))
+    sun_r = int(min(w, h) * 0.075)
+    sun_x, sun_y = int(w * 0.84), int(h * 0.14)
+    draw.ellipse((sun_x - sun_r, sun_y - sun_r, sun_x + sun_r, sun_y + sun_r), fill=(250, 220, 110))
 
-    # 동물 네 마리를 기호적인 원형 캐릭터로 표시
+    # 동물 네 마리를 안전 영역 안쪽에 배치
     centers = [
-        (int(w * 0.30), int(h * 0.56)),
-        (int(w * 0.43), int(h * 0.59)),
-        (int(w * 0.56), int(h * 0.55)),
-        (int(w * 0.69), int(h * 0.60)),
+        (int(w * 0.21), int(h * 0.60)),
+        (int(w * 0.40), int(h * 0.64)),
+        (int(w * 0.60), int(h * 0.60)),
+        (int(w * 0.79), int(h * 0.64)),
     ]
     colors = [(205, 150, 95), (115, 115, 125), (235, 235, 235), (220, 205, 190)]
+    r = max(28, int(min(w, h) * 0.09))
     for (cx, cy), color in zip(centers, colors):
-        r = int(h * 0.075)
         draw.ellipse((cx-r, cy-r, cx+r, cy+r), fill=color, outline=(35, 35, 35), width=4)
         eye = max(3, r // 10)
         draw.ellipse((cx-r//3-eye, cy-r//5-eye, cx-r//3+eye, cy-r//5+eye), fill=(20, 20, 20))
         draw.ellipse((cx+r//3-eye, cy-r//5-eye, cx+r//3+eye, cy-r//5+eye), fill=(20, 20, 20))
 
-    font_big = load_font(max(36, int(h * 0.065)))
-    font_small = load_font(max(22, int(h * 0.038)), bold=False)
+    font_big = load_font(max(36, int(h * 0.052)))
+    font_small = load_font(max(20, int(h * 0.028)), bold=False)
     title = f"SCENE {index:02d}"
     box = draw.textbbox((0, 0), title, font=font_big)
-    draw.text(((w - (box[2]-box[0]))/2, h*0.11), title, font=font_big, fill="white",
+    draw.text(((w - (box[2]-box[0]))/2, h*0.10), title, font=font_big, fill="white",
               stroke_width=3, stroke_fill=(0,0,0))
-    short = caption[:34]
+    short = caption[:28]
     box2 = draw.textbbox((0, 0), short, font=font_small)
-    draw.text(((w - (box2[2]-box2[0]))/2, h*0.25), short, font=font_small, fill="white",
+    draw.text(((w - (box2[2]-box2[0]))/2, h*0.19), short, font=font_small, fill="white",
               stroke_width=2, stroke_fill=(0,0,0))
     return img
+
+
+def wrap_text(draw: ImageDraw.ImageDraw, text: str, font, max_width: int, stroke_width: int = 0, max_lines: int = 0) -> list[str]:
+    cleaned = (text or "").strip()
+    if not cleaned:
+        return []
+
+    lines: list[str] = []
+    for raw in cleaned.splitlines():
+        current = ""
+        for ch in raw:
+            trial = current + ch
+            bb = draw.textbbox((0, 0), trial, font=font, stroke_width=stroke_width)
+            if bb[2] - bb[0] <= max_width or not current:
+                current = trial
+            else:
+                lines.append(current.strip())
+                current = ch
+        if current.strip():
+            lines.append(current.strip())
+
+    lines = [line for line in lines if line]
+    if max_lines > 0 and len(lines) > max_lines:
+        lines = lines[:max_lines]
+        while lines:
+            trial = lines[-1].rstrip(" .") + "…"
+            bb = draw.textbbox((0, 0), trial, font=font, stroke_width=stroke_width)
+            if bb[2] - bb[0] <= max_width:
+                lines[-1] = trial
+                break
+            lines[-1] = lines[-1][:-1]
+            if not lines[-1]:
+                lines[-1] = "…"
+                break
+    return lines
 
 
 def caption_overlay(text: str, size: Tuple[int, int]) -> np.ndarray:
     w, h = size
     overlay = Image.new("RGBA", size, (0, 0, 0, 0))
     draw = ImageDraw.Draw(overlay)
-    font = load_font(max(30, int(h * 0.052)))
+    font = load_font(max(28, int(h * 0.034)))
 
-    max_width = int(w * 0.82)
-    words = text.split(" ")
-    lines, current = [], ""
-    for word in words:
-        trial = word if not current else f"{current} {word}"
-        bb = draw.textbbox((0,0), trial, font=font, stroke_width=2)
-        if bb[2] - bb[0] <= max_width:
-            current = trial
-        else:
-            if current:
-                lines.append(current)
-            current = word
-    if current:
-        lines.append(current)
+    safe_left = int(w * 0.06)
+    safe_right = int(w * 0.94)
+    max_width = safe_right - safe_left - int(w * 0.06)
+    lines = wrap_text(draw, text, font, max_width=max_width, stroke_width=2, max_lines=4)
+    if not lines:
+        return np.array(overlay)
 
-    line_h = int(h * 0.072)
-    total_h = line_h * len(lines) + int(h * 0.045)
-    y0 = h - total_h - int(h * 0.06)
+    font_h = draw.textbbox((0, 0), "가", font=font, stroke_width=2)[3]
+    line_gap = max(6, int(font_h * 0.35))
+    line_h = font_h + line_gap
+    total_h = line_h * len(lines) + int(h * 0.05)
+    y0 = h - total_h - int(h * 0.045)
 
     draw.rounded_rectangle(
-        (int(w*0.07), y0, int(w*0.93), h-int(h*0.045)),
+        (safe_left, y0, safe_right, h - int(h * 0.03)),
         radius=24,
         fill=(0, 0, 0, 150),
     )
 
     y = y0 + int(h * 0.018)
     for line in lines:
-        bb = draw.textbbox((0,0), line, font=font, stroke_width=2)
+        bb = draw.textbbox((0, 0), line, font=font, stroke_width=2)
         tw = bb[2] - bb[0]
         draw.text(
             ((w - tw) / 2, y),
@@ -155,31 +231,42 @@ def title_overlay(title: str, subtitle: str, size: Tuple[int, int]) -> np.ndarra
     w, h = size
     overlay = Image.new("RGBA", size, (0, 0, 0, 0))
     draw = ImageDraw.Draw(overlay)
-    title_font = load_font(max(48, int(h*0.085)))
-    sub_font = load_font(max(24, int(h*0.040)), bold=False)
+    title_font = load_font(max(44, int(h * 0.05)))
+    sub_font = load_font(max(24, int(h * 0.028)), bold=False)
 
-    # 상단 타이틀
-    bb = draw.textbbox((0,0), title, font=title_font, stroke_width=3)
-    tw = bb[2] - bb[0]
-    draw.text(
-        ((w-tw)/2, int(h*0.10)),
-        title,
-        font=title_font,
-        fill=(255,255,255,255),
-        stroke_width=3,
-        stroke_fill=(0,0,0,210),
-    )
+    safe_left = int(w * 0.08)
+    safe_right = int(w * 0.92)
+    max_width = safe_right - safe_left
+    title_lines = wrap_text(draw, title, title_font, max_width=max_width, stroke_width=3, max_lines=2)
+    subtitle_lines = wrap_text(draw, subtitle, sub_font, max_width=max_width, stroke_width=2, max_lines=2)
 
-    bb2 = draw.textbbox((0,0), subtitle, font=sub_font, stroke_width=2)
-    sw = bb2[2]-bb2[0]
-    draw.text(
-        ((w-sw)/2, int(h*0.22)),
-        subtitle,
-        font=sub_font,
-        fill=(255,255,255,245),
-        stroke_width=2,
-        stroke_fill=(0,0,0,200),
-    )
+    y = int(h * 0.08)
+    for line in title_lines:
+        bb = draw.textbbox((0, 0), line, font=title_font, stroke_width=3)
+        tw = bb[2] - bb[0]
+        draw.text(
+            ((w - tw) / 2, y),
+            line,
+            font=title_font,
+            fill=(255, 255, 255, 255),
+            stroke_width=3,
+            stroke_fill=(0, 0, 0, 210),
+        )
+        y += int((bb[3] - bb[1]) * 1.15)
+
+    y += int(h * 0.015)
+    for line in subtitle_lines:
+        bb = draw.textbbox((0, 0), line, font=sub_font, stroke_width=2)
+        sw = bb[2] - bb[0]
+        draw.text(
+            ((w - sw) / 2, y),
+            line,
+            font=sub_font,
+            fill=(255, 255, 255, 245),
+            stroke_width=2,
+            stroke_fill=(0, 0, 0, 200),
+        )
+        y += int((bb[3] - bb[1]) * 1.2)
     return np.array(overlay)
 
 
@@ -193,8 +280,12 @@ def make_image_scene(
     fade_seconds: float,
 ):
     if path.exists():
-        img = Image.open(path).convert("RGB")
-        img = fit_cover(img, size)
+        try:
+            with Image.open(path) as opened:
+                img = fit_cover(opened.convert("RGB"), size)
+        except OSError:
+            print(f"[안내] 이미지 열기 실패: {path.name} -> 임시 장면으로 대체")
+            img = placeholder_scene(scene_index, caption, size)
     else:
         print(f"[안내] 이미지 없음: {path.name} -> 임시 장면으로 대체")
         img = placeholder_scene(scene_index, caption, size)
@@ -229,7 +320,10 @@ def make_video_scene(
     size: Tuple[int, int],
     fade_seconds: float,
 ):
-    clip = VideoFileClip(str(path))
+    try:
+        clip = VideoFileClip(str(path))
+    except (OSError, ValueError) as exc:
+        raise VideoSourceError(str(exc)) from exc
     if clip.duration >= duration:
         clip = clip.subclipped(0, duration)
     else:
@@ -252,66 +346,116 @@ def make_video_scene(
     return clip
 
 
+def make_placeholder_scene_clip(
+    scene_index: int,
+    duration: float,
+    caption: str,
+    size: Tuple[int, int],
+    fade_seconds: float,
+):
+    img = placeholder_scene(scene_index, caption, size)
+    base = ImageClip(np.array(img)).with_duration(duration)
+    canvas = CompositeVideoClip([base], size=size).with_duration(duration)
+
+    cap = ImageClip(caption_overlay(caption, size)).with_duration(duration)
+    canvas = CompositeVideoClip([canvas, cap], size=size).with_duration(duration)
+    if fade_seconds > 0:
+        canvas = canvas.with_effects([
+            vfx.FadeIn(min(fade_seconds, duration / 3)),
+            vfx.FadeOut(min(fade_seconds, duration / 3)),
+        ])
+    return canvas
+
+
 def build_video():
     cfg = load_config()
+    validate_config(cfg)
     vcfg = cfg["video"]
     size = (int(vcfg["width"]), int(vcfg["height"]))
     fps = int(vcfg.get("fps", 30))
     fade_seconds = float(vcfg.get("fade_seconds", 0.35))
 
     clips = []
-    for i, scene in enumerate(cfg["scenes"], start=1):
-        source = ROOT / scene["source"]
-        duration = float(scene.get("duration", 7.5))
-        caption = scene.get("caption", "")
-        zoom = float(scene.get("zoom", 1.04))
+    final = None
+    title = None
+    bgm_source = None
+    bgm = None
+    try:
+        for i, scene in enumerate(cfg["scenes"], start=1):
+            source = ROOT / scene["source"]
+            duration = float(scene.get("duration", 7.5))
+            caption = scene.get("caption", "")
+            zoom = float(scene.get("zoom", 1.04))
 
-        if source.suffix.lower() in {".mp4", ".mov", ".mkv", ".webm", ".m4v"} and source.exists():
-            clip = make_video_scene(source, duration, caption, size, fade_seconds)
+            if source.suffix.lower() in VIDEO_EXTENSIONS:
+                if source.exists():
+                    try:
+                        clip = make_video_scene(source, duration, caption, size, fade_seconds)
+                    except VideoSourceError:
+                        print(f"[안내] 영상 열기 실패: {source.name} -> 임시 장면으로 대체")
+                        clip = make_placeholder_scene_clip(i, duration, caption, size, fade_seconds)
+                else:
+                    print(f"[안내] 영상 없음: {source.name} -> 임시 장면으로 대체")
+                    clip = make_placeholder_scene_clip(i, duration, caption, size, fade_seconds)
+            else:
+                clip = make_image_scene(source, duration, caption, zoom, size, i, fade_seconds)
+            clips.append(clip)
+
+        final = concatenate_videoclips(clips, method="compose")
+
+        # 첫 장면 상단 타이틀
+        title_duration = min(4.5, final.duration)
+        title = ImageClip(
+            title_overlay(cfg.get("project_title", ""), cfg.get("subtitle", ""), size)
+        ).with_duration(title_duration)
+        title = title.with_effects([vfx.FadeIn(0.5), vfx.FadeOut(0.7)])
+        final = CompositeVideoClip([final, title], size=size).with_duration(final.duration)
+
+        # BGM이 있으면 전체 길이에 맞춰 반복 후 믹싱
+        bgm_path = ROOT / cfg.get("bgm", "")
+        if bgm_path.exists() and bgm_path.is_file():
+            try:
+                bgm_source = AudioFileClip(str(bgm_path))
+                bgm = bgm_source.with_effects([
+                    afx.AudioLoop(duration=final.duration),
+                    afx.MultiplyVolume(float(vcfg.get("bgm_volume", 0.16))),
+                    afx.AudioFadeIn(1.0),
+                    afx.AudioFadeOut(1.5),
+                ])
+                if final.audio is not None:
+                    final = final.with_audio(CompositeAudioClip([final.audio, bgm]))
+                else:
+                    final = final.with_audio(bgm)
+            except (OSError, ValueError):
+                print(f"[안내] BGM 로드 실패: {bgm_path}. 무음 영상으로 생성합니다.")
         else:
-            clip = make_image_scene(source, duration, caption, zoom, size, i, fade_seconds)
-        clips.append(clip)
+            print(f"[안내] BGM 없음: {bgm_path}. 무음 영상으로 생성합니다.")
 
-    final = concatenate_videoclips(clips, method="compose")
-
-    # 첫 장면 상단 타이틀
-    title_duration = min(4.5, final.duration)
-    title = ImageClip(
-        title_overlay(cfg.get("project_title", ""), cfg.get("subtitle", ""), size)
-    ).with_duration(title_duration)
-    title = title.with_effects([vfx.FadeIn(0.5), vfx.FadeOut(0.7)])
-    final = CompositeVideoClip([final, title], size=size).with_duration(final.duration)
-
-    # BGM이 있으면 전체 길이에 맞춰 반복 후 믹싱
-    bgm_path = ROOT / cfg.get("bgm", "")
-    if bgm_path.exists():
-        bgm = AudioFileClip(str(bgm_path))
-        bgm = bgm.with_effects([
-            afx.AudioLoop(duration=final.duration),
-            afx.MultiplyVolume(float(vcfg.get("bgm_volume", 0.16))),
-            afx.AudioFadeIn(1.0),
-            afx.AudioFadeOut(1.5),
-        ])
-        if final.audio is not None:
-            final = final.with_audio(CompositeAudioClip([final.audio, bgm]))
+        out = ROOT / cfg.get("output", "output/animal_trip.mp4")
+        out.parent.mkdir(parents=True, exist_ok=True)
+        print(f"[렌더링 시작] {out}")
+        final.write_videofile(
+            str(out),
+            fps=fps,
+            codec="libx264",
+            audio_codec="aac",
+            preset="medium",
+            threads=4,
+            ffmpeg_params=["-pix_fmt", "yuv420p", "-movflags", "+faststart"],
+        )
+        print(f"[완료] {out}")
+    finally:
+        if final is not None:
+            final.close()
         else:
-            final = final.with_audio(bgm)
-    else:
-        print(f"[안내] BGM 없음: {bgm_path}. 무음 영상으로 생성합니다.")
-
-    out = ROOT / cfg.get("output", "output/animal_trip.mp4")
-    out.parent.mkdir(parents=True, exist_ok=True)
-    print(f"[렌더링 시작] {out}")
-    final.write_videofile(
-        str(out),
-        fps=fps,
-        codec="libx264",
-        audio_codec="aac",
-        preset="medium",
-        threads=4,
-        ffmpeg_params=["-pix_fmt", "yuv420p", "-movflags", "+faststart"],
-    )
-    print(f"[완료] {out}")
+            if title is not None:
+                title.close()
+            if bgm is not None:
+                bgm.close()
+            if bgm_source is not None:
+                bgm_source.close()
+            for clip in clips:
+                clip.close()
 
 
 if __name__ == "__main__":

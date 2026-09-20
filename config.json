@@ -1,62 +1,56 @@
 {
-  "project_title": "동물 친구들의 바닷가 보물찾기",
-  "subtitle": "강아지 · 고양이 · 팬더 · 토끼의 신나는 바다 모험",
+  "project_title": "길 잃은 아기 오리와 고양이",
+  "subtitle": "AI 숏츠 스토리 · 30초 감동 모험",
   "video": {
-    "width": 1280,
-    "height": 720,
+    "width": 1080,
+    "height": 1920,
     "fps": 30,
     "fade_seconds": 0.35,
     "bgm_volume": 0.16
   },
-  "bgm": "assets/audio/bgm.mp3",
-  "output": "output/animal_trip.mp4",
+  "bgm": "assets/audio/shorts_bgm.mp3",
+  "output": "output/kitten_duckling_shorts.mp4",
   "scenes": [
     {
-      "source": "assets/images/beach_arrival.png",
-      "caption": "와! 드디어 바닷가에 도착했어요!",
-      "duration": 7.5,
-      "zoom": 1.04
-    },
-    {
-      "source": "assets/images/map_discovery.png",
-      "caption": "모래사장에서 신비한 보물지도를 찾았어요!",
-      "duration": 7.5,
+      "source": "assets/images/departure.png",
+      "caption": "비 오는 골목, 아기 오리가 혼자 울고 있어요",
+      "duration": 4.8,
       "zoom": 1.05
     },
     {
-      "source": "assets/images/treasure_hunt_start.png",
-      "caption": "네 친구가 보물지도를 따라 출발해요!",
-      "duration": 7.5,
+      "source": "assets/images/country_road.png",
+      "caption": "노란 우산을 든 아기 고양이가 조심히 다가와요",
+      "duration": 4.6,
       "zoom": 1.04
     },
     {
-      "source": "assets/images/shell_collecting.png",
-      "caption": "예쁜 조개와 반짝이는 돌도 찾았어요!",
-      "duration": 7.5,
+      "source": "assets/images/field.png",
+      "caption": "고양이는 작은 발자국을 따라 오리의 집을 찾아요",
+      "duration": 4.7,
       "zoom": 1.05
     },
     {
-      "source": "assets/images/cave_found.png",
-      "caption": "지도 끝에서 작은 동굴을 발견했어요!",
-      "duration": 7.5,
+      "source": "assets/images/forest_walk.png",
+      "caption": "깜깜한 숲길에서도 둘은 꼭 붙어 걸었어요",
+      "duration": 4.8,
       "zoom": 1.04
     },
     {
-      "source": "assets/images/treasure_box.png",
-      "caption": "드디어 모래 속 보물상자를 찾았어요!",
-      "duration": 7.5,
+      "source": "assets/images/house.png",
+      "caption": "드디어 연못 앞! 엄마 오리가 둘을 발견해요",
+      "duration": 4.6,
       "zoom": 1.05
     },
     {
-      "source": "assets/images/sunset_treasure.png",
-      "caption": "노을 아래서 보물을 함께 열어봤어요!",
-      "duration": 7.5,
+      "source": "assets/images/snack.png",
+      "caption": "고마운 마음으로 따뜻한 빵을 함께 나눠 먹어요",
+      "duration": 4.7,
       "zoom": 1.04
     },
     {
-      "source": "assets/images/beach_goodbye.png",
-      "caption": "즐거운 바닷가 보물찾기, 다음에 또 만나요!",
-      "duration": 7.5,
+      "source": "assets/images/sunset.png",
+      "caption": "해 질 무렵, 세 친구는 다음 모험을 약속해요",
+      "duration": 4.8,
       "zoom": 1.03
     }
   ]
