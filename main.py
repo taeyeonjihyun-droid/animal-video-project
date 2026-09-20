@@ -77,7 +77,7 @@ def build_scene_prompt(
     )
 
 
-def generate_image_prompts(output_override: str | None = None):
+def generate_image_prompts(output_override: str | None = None) -> None:
     cfg = load_config()
     vcfg = cfg.get("video", {})
     width = int(vcfg.get("width", 1280))
