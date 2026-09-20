@@ -59,8 +59,8 @@ Environment variables:
 - `RUNWAYML_API_SECRET`: Runway API key for `runway`
 - `RUNWAY_MODEL`: Runway model name, default `gen4_turbo`
 - `RUNWAY_GENERATION_MODE`: `text_to_video` or `image_to_video`
-- `RUNWAY_DURATION`: `auto` or integer seconds
-- `RUNWAY_RATIO`: optional explicit Runway ratio override
+- `RUNWAY_DURATION`: optional global override; leave blank to use each shot’s `duration_seconds`
+- `RUNWAY_RATIO`: optional explicit Runway ratio override; leave blank to use the scene aspect ratio mapping
 - `RUNWAY_PROMPT_IMAGE`: required only for `image_to_video`
 
 ## Dry-run usage

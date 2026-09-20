@@ -206,6 +206,12 @@ def parse_runway_duration(duration_value: str) -> str | int:
     return duration
 
 
+def parse_optional_runway_duration(duration_value: str | None) -> str | int | None:
+    if duration_value is None or not duration_value.strip():
+        return None
+    return parse_runway_duration(duration_value)
+
+
 def resolve_runway_ratio(package: dict[str, Any]) -> str:
     ratio_value = os.environ.get("RUNWAY_RATIO", "").strip()
     if ratio_value:
@@ -309,7 +315,7 @@ class RunwayAdapter(ProviderAdapter):
         api_key: str,
         model: str,
         generation_mode: str,
-        duration: str | int,
+        duration: str | int | None,
         prompt_image: str | None,
         client_factory: Any | None = None,
     ) -> None:
@@ -339,7 +345,7 @@ class RunwayAdapter(ProviderAdapter):
                 "model": self.model,
                 "prompt_text": shot["prompt"],
                 "ratio": ratio,
-                "duration": self.duration,
+                "duration": self.duration if self.duration is not None else int(shot["duration_seconds"]),
                 "negative_prompt": shot["negative_prompt"],
             }
             if self.generation_mode == "image_to_video":
@@ -408,7 +414,7 @@ def build_adapter(provider: str, dry_run: bool) -> ProviderAdapter:
             api_key=api_key,
             model=os.environ.get("RUNWAY_MODEL", "gen4_turbo").strip() or "gen4_turbo",
             generation_mode=generation_mode,
-            duration=parse_runway_duration(os.environ.get("RUNWAY_DURATION", "auto")),
+            duration=parse_optional_runway_duration(os.environ.get("RUNWAY_DURATION")),
             prompt_image=os.environ.get("RUNWAY_PROMPT_IMAGE"),
         )
     if provider == "generic-webhook":

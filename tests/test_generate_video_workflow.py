@@ -14,7 +14,9 @@ from generate_video_workflow import (
     build_shot_prompt,
     decode_provider_response,
     load_scene_spec,
+    load_env_file,
     parse_env_value,
+    parse_optional_runway_duration,
     parse_runway_duration,
     parse_timeout,
     resolve_runway_ratio,
@@ -100,6 +102,11 @@ class GenerateVideoWorkflowTests(unittest.TestCase):
             parse_runway_duration("bad")
         with self.assertRaisesRegex(ValueError, "greater than 0"):
             parse_runway_duration("0")
+
+    def test_parse_optional_runway_duration_supports_blank_override(self):
+        self.assertIsNone(parse_optional_runway_duration(None))
+        self.assertIsNone(parse_optional_runway_duration(""))
+        self.assertEqual(parse_optional_runway_duration("auto"), "auto")
 
     def test_decode_provider_response_supports_plain_text(self):
         self.assertEqual(decode_provider_response(""), {})
@@ -192,6 +199,15 @@ class GenerateVideoWorkflowTests(unittest.TestCase):
         self.assertEqual(parse_env_value('"quoted value"'), "quoted value")
         self.assertEqual(parse_env_value("value # comment"), "value")
 
+    @patch.dict("os.environ", {}, clear=True)
+    def test_load_env_file_with_blank_runway_ratio_keeps_scene_mapping(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            env_path = Path(temp_dir) / ".env"
+            env_path.write_text("RUNWAY_RATIO=\n", encoding="utf-8")
+            load_env_file(env_path)
+            package = build_scene_package({**self.spec, "aspect_ratio": "9:16"})
+            self.assertEqual(resolve_runway_ratio(package), "720:1280")
+
     def test_runway_adapter_submits_all_shots(self):
         package = build_scene_package(self.spec)
 
@@ -226,7 +242,7 @@ class GenerateVideoWorkflowTests(unittest.TestCase):
             api_key="secret",
             model="gen4_turbo",
             generation_mode="text_to_video",
-            duration="auto",
+            duration=None,
             prompt_image=None,
             client_factory=factory,
         )
@@ -240,6 +256,49 @@ class GenerateVideoWorkflowTests(unittest.TestCase):
         self.assertEqual(created_clients[0].api_key, "secret")
         self.assertEqual(len(created_clients[0].text_to_video.calls), 4)
         self.assertEqual(created_clients[0].text_to_video.calls[0]["model"], "gen4_turbo")
+        self.assertEqual(created_clients[0].text_to_video.calls[0]["duration"], 4)
+        self.assertEqual(created_clients[0].text_to_video.calls[-1]["duration"], 3)
+
+    def test_runway_adapter_honors_explicit_duration_override(self):
+        package = build_scene_package(self.spec)
+
+        class FakeTask:
+            def __init__(self, task_id):
+                self.id = task_id
+
+        class FakeTextToVideo:
+            def __init__(self):
+                self.calls = []
+
+            def create(self, **kwargs):
+                self.calls.append(kwargs)
+                return FakeTask(f"task-{len(self.calls)}")
+
+        class FakeClient:
+            def __init__(self, api_key):
+                self.api_key = api_key
+                self.text_to_video = FakeTextToVideo()
+
+        created_clients = []
+
+        def factory(api_key):
+            client = FakeClient(api_key)
+            created_clients.append(client)
+            return client
+
+        adapter = RunwayAdapter(
+            api_key="secret",
+            model="gen4_turbo",
+            generation_mode="text_to_video",
+            duration="auto",
+            prompt_image=None,
+            client_factory=factory,
+        )
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            adapter.run(package, Path(temp_dir))
+
+        self.assertEqual(created_clients[0].text_to_video.calls[0]["duration"], "auto")
 
     def test_runway_adapter_requires_prompt_image_for_image_mode(self):
         package = build_scene_package(self.spec)
