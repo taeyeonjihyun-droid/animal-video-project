@@ -42,7 +42,10 @@ def parse_args():
         default=None,
         help="프롬프트 JSON 출력 경로 (기본: output/scene_image_prompts.json)",
     )
-    return parser.parse_args()
+    args = parser.parse_args()
+    if args.prompts_output and not args.generate_image_prompts:
+        parser.error("--prompts-output는 --generate-image-prompts와 함께 사용해야 합니다.")
+    return args
 
 
 def aspect_ratio_label(width: int, height: int) -> str:
@@ -83,6 +86,8 @@ def generate_image_prompts(output_override: str | None = None):
         raise ValueError("video.width와 video.height는 1 이상의 값이어야 합니다.")
 
     scenes = cfg.get("scenes", [])
+    if not isinstance(scenes, list) or not all(isinstance(scene, dict) for scene in scenes):
+        raise ValueError("config.json의 scenes는 장면 객체(dict) 목록(list)이어야 합니다.")
     project_title = str(cfg.get("project_title", ""))
     subtitle = str(cfg.get("subtitle", ""))
     total = max(1, len(scenes))
