@@ -178,7 +178,7 @@ python main.py --batch-render --batch-file batch_config.json
 
 옵션:
 - `--batch-file`을 생략하면 기본값으로 `batch_config.json`을 사용합니다.
-- `--batch-file` 경로는 명령 실행 위치(현재 디렉터리) 기준 상대 경로 또는 절대 경로를 사용할 수 있습니다.
+- `--batch-file` 경로는 명령 실행 위치(현재 디렉터리) 기준 상대 경로이며, 프로젝트 폴더 내부 파일만 허용됩니다.
 - `overrides`는 각 작업의 설정을 덮어쓸 때 사용합니다(예: `output`, `project_title`, `subtitle`).
 - `jobs[].config` 경로는 **배치 파일 위치 기준 상대 경로**로 해석됩니다.
 

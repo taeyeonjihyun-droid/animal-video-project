@@ -100,7 +100,7 @@ def parse_args() -> argparse.Namespace:
         "--batch-file",
         type=str,
         default=None,
-        help="배치 설정 JSON 경로 (현재 디렉터리 기준 상대 경로 또는 절대 경로, 기본: batch_config.json)",
+        help="배치 설정 JSON 경로 (현재 디렉터리 기준 상대 경로, 프로젝트 내부 파일만 허용, 기본: batch_config.json)",
     )
     args = parser.parse_args()
     if args.prompts_output and not args.generate_image_prompts:
