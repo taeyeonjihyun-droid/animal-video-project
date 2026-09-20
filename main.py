@@ -120,13 +120,18 @@ def generate_image_prompts(output_override: str | None = None):
         if output_override
         else cfg.get("image_prompt_output", "output/scene_image_prompts.json")
     )
-    out = selected_output if selected_output.is_absolute() else ROOT / selected_output
+    if selected_output.is_absolute():
+        raise ValueError("프롬프트 출력 경로는 프로젝트 상대 경로로 입력해야 합니다.")
+    if ".." in selected_output.parts:
+        raise ValueError("프롬프트 출력 경로에 상위 디렉터리(..)를 사용할 수 없습니다.")
+
+    out = ROOT / selected_output
+    out.parent.mkdir(parents=True, exist_ok=True)
     resolved_out = out.resolve()
     resolved_root = ROOT.resolve()
     if not resolved_out.is_relative_to(resolved_root):
         raise ValueError("프롬프트 출력 경로는 프로젝트 폴더 내부여야 합니다.")
     out = resolved_out
-    out.parent.mkdir(parents=True, exist_ok=True)
     payload = {
         "project_title": project_title,
         "subtitle": subtitle,
