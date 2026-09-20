@@ -2,3 +2,4 @@ moviepy==2.2.1
 Pillow>=10.4.0
 numpy>=1.26.0
 imageio-ffmpeg>=0.5.1
+runwayml==5.20.0
