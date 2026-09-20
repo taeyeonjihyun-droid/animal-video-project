@@ -354,7 +354,7 @@ class RunwayAdapter(ProviderAdapter):
             raise ValueError(
                 "RUNWAY_PROMPT_IMAGE is required when RUNWAY_GENERATION_MODE=image_to_video."
             )
-        client = self.client_factory(self.api_key)
+        client = self.client_factory(api_key=self.api_key)
         tasks = []
 
         write_json(output_dir / "scene_package.json", package)

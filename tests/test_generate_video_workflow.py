@@ -262,7 +262,7 @@ class GenerateVideoWorkflowTests(unittest.TestCase):
 
         created_clients = []
 
-        def factory(api_key):
+        def factory(*, api_key):
             client = FakeClient(api_key)
             created_clients.append(client)
             return client
@@ -310,7 +310,7 @@ class GenerateVideoWorkflowTests(unittest.TestCase):
 
         created_clients = []
 
-        def factory(api_key):
+        def factory(*, api_key):
             client = FakeClient(api_key)
             created_clients.append(client)
             return client
@@ -342,7 +342,7 @@ class GenerateVideoWorkflowTests(unittest.TestCase):
             generation_mode="image_to_video",
             duration="auto",
             prompt_image=None,
-            client_factory=lambda api_key: FakeClient(api_key),
+            client_factory=lambda *, api_key: FakeClient(api_key),
         )
 
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -357,7 +357,7 @@ class GenerateVideoWorkflowTests(unittest.TestCase):
                 generation_mode="bad-mode",
                 duration="auto",
                 prompt_image=None,
-                client_factory=lambda api_key: None,
+                client_factory=lambda *, api_key: None,
             )
 
     def test_runway_adapter_wraps_submission_errors(self):
