@@ -3,6 +3,9 @@ name: Render animal video (수동 실행)
 on:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 concurrency:
   group: render-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -30,6 +33,11 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+
+      - name: Clean previous outputs
+        run: |
+          mkdir -p output
+          rm -f output/*.mp4
 
       - name: Render video
         run: python main.py
