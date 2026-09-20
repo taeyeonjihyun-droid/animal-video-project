@@ -147,7 +147,6 @@ def generate_image_prompts(output_override: str | None = None) -> None:
     cfg = load_config()
     generate_image_prompts_from_config(
         cfg=cfg,
-        config_dir=CONFIG_PATH.parent,
         output_override=output_override,
     )
 
@@ -155,7 +154,6 @@ def generate_image_prompts(output_override: str | None = None) -> None:
 def generate_image_prompts_from_config(
     cfg: dict,
     *,
-    config_dir: Path,
     output_override: str | None = None,
 ) -> None:
     vcfg = cfg.get("video", {})
@@ -203,7 +201,7 @@ def generate_image_prompts_from_config(
         raise ValueError("프롬프트 출력 경로는 비어 있을 수 없습니다.")
     out = resolve_repo_relative_path(
         selected_output,
-        base_dir=ROOT if output_override else config_dir,
+        base_dir=ROOT,
         must_exist=False,
         allow_parent_create=True,
     )
