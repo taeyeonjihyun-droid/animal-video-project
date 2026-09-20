@@ -191,6 +191,14 @@ def import_runway_client():
     return RunwayML
 
 
+def import_runway_submission_errors():
+    try:
+        from runwayml import RunwayMLError, TaskFailedError, TaskTimeoutError
+    except ImportError:
+        return ()
+    return (RunwayMLError, TaskFailedError, TaskTimeoutError)
+
+
 def parse_runway_duration(duration_value: str) -> str | int:
     value = duration_value.strip().lower()
     if value == "auto":
@@ -344,8 +352,9 @@ class RunwayAdapter(ProviderAdapter):
             raise ValueError(
                 "RUNWAY_PROMPT_IMAGE is required when RUNWAY_GENERATION_MODE=image_to_video."
             )
-        client = self.client_factory(api_key=self.api_key)
+        client = self.client_factory(self.api_key)
         tasks = []
+        runway_errors = import_runway_submission_errors()
 
         write_json(output_dir / "scene_package.json", package)
 
@@ -361,14 +370,14 @@ class RunwayAdapter(ProviderAdapter):
                 create_kwargs["prompt_image"] = prompt_image
                 try:
                     task = client.image_to_video.create(**create_kwargs)
-                except Exception as exc:
+                except runway_errors as exc:
                     raise RuntimeError(
                         f"Runway submission failed for shot {shot['id']}: {exc}"
                     ) from exc
             else:
                 try:
                     task = client.text_to_video.create(**create_kwargs)
-                except Exception as exc:
+                except runway_errors as exc:
                     raise RuntimeError(
                         f"Runway submission failed for shot {shot['id']}: {exc}"
                     ) from exc
@@ -440,7 +449,7 @@ def build_adapter(provider: str, dry_run: bool) -> ProviderAdapter:
 
 
 def resolve_config_path(value: str | None, default_path: Path, base_dir: Path) -> Path:
-    if value is None:
+    if value is None or not value.strip():
         return default_path
     path = Path(value)
     if path.is_absolute():

@@ -19,6 +19,7 @@ from generate_video_workflow import (
     parse_optional_runway_duration,
     parse_runway_duration,
     parse_timeout,
+    resolve_config_path,
     resolve_runway_ratio,
     resolve_runway_duration_for_shot,
     validate_scene_spec,
@@ -207,10 +208,20 @@ class GenerateVideoWorkflowTests(unittest.TestCase):
         self.assertEqual(resolve_runway_ratio(tall_package), "720:1280")
         self.assertEqual(resolve_runway_ratio(square_package), "960:960")
 
+    @patch.dict("os.environ", {}, clear=True)
+    def test_resolve_runway_ratio_falls_back_for_unknown_aspect_ratio(self):
+        package = build_scene_package({**self.spec, "aspect_ratio": "2:1"})
+        self.assertEqual(resolve_runway_ratio(package), "1280:720")
+
     def test_parse_env_value_supports_quotes_and_inline_comments(self):
         self.assertEqual(parse_env_value(" plain "), "plain")
         self.assertEqual(parse_env_value('"quoted value"'), "quoted value")
         self.assertEqual(parse_env_value("value # comment"), "value")
+
+    def test_resolve_config_path_treats_blank_as_default(self):
+        default_path = Path("/tmp/default.env")
+        base_dir = Path("/tmp/base")
+        self.assertEqual(resolve_config_path("", default_path, base_dir), default_path)
 
     @patch.dict("os.environ", {}, clear=True)
     def test_load_env_file_with_blank_runway_ratio_keeps_scene_mapping(self):
@@ -365,8 +376,9 @@ class GenerateVideoWorkflowTests(unittest.TestCase):
         )
 
         with tempfile.TemporaryDirectory() as temp_dir:
-            with self.assertRaisesRegex(RuntimeError, "Runway submission failed for shot shot_01"):
-                adapter.run(package, Path(temp_dir))
+            with patch("generate_video_workflow.import_runway_submission_errors", return_value=(RuntimeError,)):
+                with self.assertRaisesRegex(RuntimeError, "Runway submission failed for shot shot_01"):
+                    adapter.run(package, Path(temp_dir))
 
 
 if __name__ == "__main__":
