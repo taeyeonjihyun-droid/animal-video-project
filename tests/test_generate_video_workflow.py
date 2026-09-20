@@ -5,7 +5,9 @@ from generate_video_workflow import (
     DEFAULT_SCENE_SPEC,
     build_scene_package,
     build_shot_prompt,
+    decode_provider_response,
     load_scene_spec,
+    parse_timeout,
     validate_scene_spec,
 )
 
@@ -47,6 +49,21 @@ class GenerateVideoWorkflowTests(unittest.TestCase):
         self.assertIn("cat checks the stacked luggage", prompt)
         self.assertIn("giant panda", prompt)
         self.assertIn("fennec fox", prompt)
+
+    def test_parse_timeout_rejects_non_positive_values(self):
+        self.assertEqual(parse_timeout("120"), 120)
+        with self.assertRaisesRegex(ValueError, "greater than 0"):
+            parse_timeout("0")
+        with self.assertRaisesRegex(ValueError, "greater than 0"):
+            parse_timeout("-3")
+
+    def test_decode_provider_response_supports_plain_text(self):
+        self.assertEqual(decode_provider_response(""), {})
+        self.assertEqual(decode_provider_response('{"job_id":"abc"}'), {"job_id": "abc"})
+        self.assertEqual(
+            decode_provider_response("job-12345"),
+            {"raw_response": "job-12345"},
+        )
 
 
 if __name__ == "__main__":

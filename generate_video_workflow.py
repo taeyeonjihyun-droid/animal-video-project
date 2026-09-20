@@ -4,6 +4,7 @@ import argparse
 import json
 import os
 from abc import ABC, abstractmethod
+from json import JSONDecodeError
 from pathlib import Path
 from typing import Any
 from urllib import error, request
@@ -112,6 +113,25 @@ def write_json(path: Path, payload: dict[str, Any]) -> None:
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
+def parse_timeout(timeout_value: str) -> int:
+    try:
+        timeout = int(timeout_value)
+    except ValueError as exc:
+        raise ValueError("VIDEO_API_TIMEOUT must be an integer number of seconds.") from exc
+    if timeout <= 0:
+        raise ValueError("VIDEO_API_TIMEOUT must be greater than 0 seconds.")
+    return timeout
+
+
+def decode_provider_response(response_text: str) -> dict[str, Any]:
+    if not response_text:
+        return {}
+    try:
+        return json.loads(response_text)
+    except JSONDecodeError:
+        return {"raw_response": response_text}
+
+
 class ProviderAdapter(ABC):
     @abstractmethod
     def run(self, package: dict[str, Any], output_dir: Path) -> dict[str, Any]:
@@ -164,7 +184,7 @@ class GenericWebhookAdapter(ProviderAdapter):
         try:
             with request.urlopen(http_request, timeout=self.timeout) as response:
                 response_text = response.read().decode("utf-8")
-                response_payload = json.loads(response_text) if response_text else {}
+                response_payload = decode_provider_response(response_text)
         except error.HTTPError as exc:
             detail = exc.read().decode("utf-8", errors="replace")
             raise RuntimeError(f"Provider request failed with HTTP {exc.code}: {detail}") from exc
@@ -191,11 +211,7 @@ def build_adapter(provider: str, dry_run: bool) -> ProviderAdapter:
         api_url = os.environ.get("VIDEO_API_URL", "").strip()
         if not api_url:
             raise ValueError("VIDEO_API_URL is required when VIDEO_PROVIDER=generic-webhook.")
-        timeout_value = os.environ.get("VIDEO_API_TIMEOUT", "120")
-        try:
-            timeout = int(timeout_value)
-        except ValueError as exc:
-            raise ValueError("VIDEO_API_TIMEOUT must be an integer number of seconds.") from exc
+        timeout = parse_timeout(os.environ.get("VIDEO_API_TIMEOUT", "120"))
         return GenericWebhookAdapter(
             api_url=api_url,
             api_key=os.environ.get("VIDEO_API_KEY"),
