@@ -1,0 +1,80 @@
+{
+  "scene_id": "animal-travel-preparation",
+  "title": "Animal Friends Travel Preparation",
+  "aspect_ratio": "16:9",
+  "duration_seconds": 15,
+  "master_prompt": "Stylized, heartwarming, high-quality 3D animated feature-film aesthetic. In front of a cozy house in warm early-morning sunlight. The same five animal friends remain perfectly consistent across every shot: dog, cat, red panda, giant panda, and fennec fox. All five wear the same small travel bags or backpacks in every shot. Cinematic warm soft lighting, gentle smooth movement, detailed soft fur, polished family-animation quality, no dialogue, no text, no subtitles, no watermark.",
+  "negative_prompt": "Character redesigns, changing fur colors, changing proportions, changing accessories, changing backpack colors or shapes, extra limbs, duplicate animals, distorted faces, broken anatomy, flickering, jitter, harsh shadows, dark horror mood, aggressive behavior, fast chaotic motion, blurry faces, low-detail fur, text, subtitles, logos, watermark.",
+  "consistency_rules": [
+    "Keep identical appearance, proportions, fur colors and fur patterns across all shots.",
+    "Keep the same backpack or bag on each character across all shots.",
+    "Keep the same giant panda sun hat across all shots.",
+    "Maintain warm early-morning light direction and the cozy-house setting."
+  ],
+  "character_bible": [
+    {
+      "name": "dog",
+      "appearance": "small golden-brown dog with floppy ears, cream muzzle, round friendly eyes",
+      "accessories": "teal mini backpack",
+      "behavior": "happily wags tail and leans in to help friends"
+    },
+    {
+      "name": "cat",
+      "appearance": "slim gray tabby cat with white chest, neat stripes, calm green eyes",
+      "accessories": "olive travel satchel",
+      "behavior": "calmly checks luggage and keeps the group organized"
+    },
+    {
+      "name": "red panda",
+      "appearance": "rust-red red panda with cream facial markings and ringed tail",
+      "accessories": "mustard snack backpack",
+      "behavior": "carefully packs snacks and shares them with friends"
+    },
+    {
+      "name": "giant panda",
+      "appearance": "gentle giant panda with classic black-and-white fur and soft smile",
+      "accessories": "large straw sun hat and tan duffel backpack",
+      "behavior": "steady, kind presence who helps adjust bags"
+    },
+    {
+      "name": "fennec fox",
+      "appearance": "small sandy fennec fox with oversized ears and bright curious eyes",
+      "accessories": "coral mini backpack",
+      "behavior": "looks around excitedly with ears moving and bouncy anticipation"
+    }
+  ],
+  "shots": [
+    {
+      "id": "shot_01",
+      "start_seconds": 0,
+      "duration_seconds": 4,
+      "camera": "wide establishing shot slowly drifting forward",
+      "focus": "cozy house exterior glowing in warm early-morning sunlight as all five friends gather with their travel bags",
+      "action": "dog wags tail, cat checks the stacked luggage, red panda holds snack packets, giant panda smiles under the large sun hat, fennec fox scans the yard with twitching ears"
+    },
+    {
+      "id": "shot_02",
+      "start_seconds": 4,
+      "duration_seconds": 4,
+      "camera": "gentle medium shot with slight lateral move",
+      "focus": "careful travel preparation details",
+      "action": "cat calmly inspects straps and tags while the dog happily steadies a small bag and the friends softly help each other adjust backpacks"
+    },
+    {
+      "id": "shot_03",
+      "start_seconds": 8,
+      "duration_seconds": 4,
+      "camera": "warm close-to-medium character shot with soft depth of field",
+      "focus": "red panda packing snacks and fennec fox reacting with excitement",
+      "action": "red panda tucks snacks into the mustard backpack, giant panda gently lowers supplies into place, fennec fox looks around excitedly with ears moving, everyone stays close and supportive"
+    },
+    {
+      "id": "shot_04",
+      "start_seconds": 12,
+      "duration_seconds": 3,
+      "camera": "hero group shot easing upward very slightly",
+      "focus": "the friends gather together in front of the house, ready to depart",
+      "action": "all five stand shoulder to shoulder with matching travel bags, share warm looks, gently help one another, and settle into a unified departure pose"
+    }
+  ]
+}

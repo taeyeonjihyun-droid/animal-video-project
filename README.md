@@ -1,116 +1,137 @@
-# 동물 촌캉스 1분 영상 자동 제작 프로젝트
+# Animal travel video workflow
 
-유튜브용 16:9 영상을 **Python + MoviePy**로 자동 편집하는 프로젝트입니다.
+This repository now includes a practical, runnable workflow for generating a **15-second animal travel-preparation video package** for an AI video provider.
 
-원본 영상을 그대로 복제하는 것이 아니라,  
-**강아지 · 고양이 · 팬더 · 토끼가 시골 여행을 하는 새로운 1분 이야기**로 구성했습니다.
+The target scene is:
 
-## 만들어지는 영상
+- in front of a cozy house in warm early-morning sunlight
+- dog, cat, red panda, giant panda, and fennec fox
+- all five carrying small travel bags or backpacks
+- dog wagging happily, cat checking luggage, red panda packing snacks, giant panda wearing a large sun hat, fennec fox looking around excitedly with moving ears
+- gentle teamwork, gathering together, and preparing to depart
+- stylized, heartwarming, high-quality 3D animated feature-film look
+- no dialogue, no text, no watermarks
 
-- 해상도: 1280×720 (16:9)
-- 길이: 약 60초
-- 8개 장면 × 7.5초
-- 자동 자막
-- 천천히 확대되는 줌 효과
-- 장면 시작/끝 페이드
-- 선택 사항: BGM 자동 반복/믹싱
-- 출력: `output/animal_trip.mp4`
+## What was added
 
-## 폴더 구조
+- `animal_travel_preparation_scene.json`: structured scene specification
+- `generate_video_workflow.py`: provider-agnostic workflow runner
+- `.env.example`: environment-based configuration template
+- `tests/test_generate_video_workflow.py`: lightweight consistency validation
 
-```text
-animal_trip_video_project/
-├─ main.py
-├─ config.json
-├─ requirements.txt
-├─ assets/
-│  ├─ images/
-│  │  ├─ 01_departure.jpg
-│  │  ├─ 02_country_road.jpg
-│  │  ├─ 03_field.jpg
-│  │  ├─ 04_house.jpg
-│  │  ├─ 05_snack.jpg
-│  │  ├─ 06_play.jpg
-│  │  ├─ 07_evening.jpg
-│  │  └─ 08_sunset.jpg
-│  ├─ clips/
-│  ├─ audio/
-│  │  └─ bgm.mp3
-│  └─ fonts/
-├─ output/
-└─ .github/workflows/render.yml
-```
+The existing `main.py` MoviePy renderer remains available for local assembly experiments, but the new workflow is the primary path for AI video generation.
 
-이미지 파일이 없어도 `main.py`가 임시 장면을 만들어 테스트할 수 있습니다.
+## Scene package contents
 
-## 1. 가장 쉬운 방법: GitHub Actions
+The structured scene spec includes:
 
-휴대폰에서도 가능합니다.
+- master prompt
+- negative prompt
+- character bible
+- consistency rules
+- a 15-second four-shot plan
 
-1. 이 프로젝트 전체를 GitHub 저장소에 업로드합니다.
-2. `assets/images/` 안에 자신의 장면 이미지 8장을 넣습니다.
-3. 필요하면 `assets/audio/bgm.mp3`를 넣습니다.
-4. GitHub 저장소의 **Actions** 메뉴를 엽니다.
-5. **Render animal trip video**를 선택합니다.
-6. **Run workflow**를 누릅니다.
-7. 작업 완료 후 `animal-trip-video` 아티팩트를 받습니다.
+## Prerequisites
 
-## 2. PC에서 실행
+- Python 3.10+
+- `pip install -r requirements.txt`
 
-Python 3.10 이상 권장.
+No extra dependencies are required for the workflow packager.
+
+## Configuration
+
+Copy the example env file if you want local overrides:
 
 ```bash
-pip install -r requirements.txt
+cp .env.example .env
+```
+
+Environment variables:
+
+- `VIDEO_PROVIDER`: `dry-run` or `generic-webhook`
+- `VIDEO_SCENE_SPEC`: scene spec JSON path  
+  default: `animal_travel_preparation_scene.json`
+- `VIDEO_OUTPUT_DIR`: output directory  
+  default: `output/video_generation_package`
+- `VIDEO_API_URL`: required only for `generic-webhook`
+- `VIDEO_API_KEY`: optional bearer token for `generic-webhook`
+- `VIDEO_API_TIMEOUT`: optional HTTP timeout in seconds
+
+## Dry-run usage
+
+Dry-run generates the complete package without calling an external API:
+
+```bash
+python generate_video_workflow.py --dry-run
+```
+
+Output files are written to:
+
+```text
+output/video_generation_package/
+```
+
+Expected files:
+
+- `scene_package.json`
+- `provider_request.json`
+- `run_summary.json`
+
+## Provider submission usage
+
+If you have a compatible provider endpoint that accepts the generated JSON payload:
+
+```bash
+export VIDEO_PROVIDER=generic-webhook
+export VIDEO_API_URL="https://your-video-provider.example/api/generate"
+export VIDEO_API_KEY="replace-with-your-token"
+python generate_video_workflow.py
+```
+
+This writes the request package locally and stores the provider response as:
+
+```text
+output/video_generation_package/submission_response.json
+```
+
+## How to generate the final video
+
+1. Review or edit `animal_travel_preparation_scene.json`.
+2. Run `python generate_video_workflow.py --dry-run` to validate the package.
+3. Point `VIDEO_PROVIDER=generic-webhook` to your compatible video-generation API.
+4. Run `python generate_video_workflow.py` to submit the four-shot package.
+5. Retrieve the final rendered video from your provider using the saved response metadata in `output/video_generation_package/submission_response.json`.
+
+## Validation
+
+Run the lightweight tests:
+
+```bash
+python -m unittest discover -s tests -p "test_*.py"
+```
+
+These checks validate:
+
+- exactly five required characters
+- exactly four shots
+- total duration of 15 seconds
+- shot prompts include the shared consistency anchor
+
+## Existing MoviePy renderer
+
+The repository still includes the original local renderer:
+
+```bash
 python main.py
 ```
 
-완성 파일:
+It renders to:
 
 ```text
 output/animal_trip.mp4
 ```
 
-## 3. 이미지 대신 짧은 AI 영상 사용
+## Security and secrets
 
-`config.json`의 `source`를 이미지가 아니라 MP4로 바꿔도 됩니다.
-
-예:
-
-```json
-{
-  "source": "assets/clips/01_departure.mp4",
-  "caption": "여행 출발! 오늘은 시골로 떠나요",
-  "duration": 7.5,
-  "zoom": 1.0
-}
-```
-
-Veo, Gemini, Runway, Firefly 등에서 만든 짧은 클립을 넣으면  
-코드가 순서대로 연결하고 자막과 BGM을 붙입니다.
-
-## 4. 장면 순서
-
-1. 여행 출발
-2. 시골길 걷기
-3. 들판에서 놀기
-4. 시골집 도착
-5. 마당 간식 시간
-6. 네 동물이 함께 놀기
-7. 저녁 산책
-8. 노을 엔딩
-
-## 5. 자막/시간 변경
-
-`config.json`만 수정하면 됩니다.
-
-```json
-"caption": "여기에 원하는 자막",
-"duration": 7.5
-```
-
-8개 장면의 `duration` 합이 60이면 1분 영상이 됩니다.
-
-## 저작권 주의
-
-다른 유튜브 영상의 실제 영상/음원/자막을 그대로 복사하지 말고,  
-직접 만든 이미지·AI 생성 콘텐츠·사용 허가가 있는 BGM을 사용하세요.
+- Do not commit `.env`, API keys, or generated video binaries.
+- Generated output is ignored via `.gitignore`.
