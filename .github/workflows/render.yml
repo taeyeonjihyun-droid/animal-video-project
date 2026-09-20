@@ -17,7 +17,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: render-${{ github.workflow }}-${{ github.ref }}
+  group: render-${{ github.workflow }}-${{ github.ref }}-${{ inputs.run_mode || 'render' }}
   cancel-in-progress: true
 
 jobs:
@@ -51,7 +51,7 @@ jobs:
 
       - name: Generate scene prompts
         if: ${{ inputs.run_mode == 'prompts' || inputs.run_mode == 'both' }}
-        run: python main.py --generate-image-prompts
+        run: python main.py --generate-image-prompts --prompts-output output/scene_image_prompts.json
 
       - name: Render video
         if: ${{ inputs.run_mode == 'render' || inputs.run_mode == 'both' }}
