@@ -74,8 +74,7 @@ jobs:
         if: ${{ env.RUN_MODE == 'render' || env.RUN_MODE == 'both' || env.RUN_MODE == 'batch' }}
         shell: bash
         run: |
-          shopt -s globstar nullglob
-          files=(output/**/*.mp4)
+          mapfile -t files < <(find output -type f -name '*.mp4')
           if [ ${#files[@]} -eq 0 ]; then
             echo "output/ 하위에서 렌더링된 MP4를 찾지 못했습니다."
             exit 1
