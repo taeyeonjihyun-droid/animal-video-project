@@ -191,7 +191,11 @@ def build_adapter(provider: str, dry_run: bool) -> ProviderAdapter:
         api_url = os.environ.get("VIDEO_API_URL", "").strip()
         if not api_url:
             raise ValueError("VIDEO_API_URL is required when VIDEO_PROVIDER=generic-webhook.")
-        timeout = int(os.environ.get("VIDEO_API_TIMEOUT", "120"))
+        timeout_value = os.environ.get("VIDEO_API_TIMEOUT", "120")
+        try:
+            timeout = int(timeout_value)
+        except ValueError as exc:
+            raise ValueError("VIDEO_API_TIMEOUT must be an integer number of seconds.") from exc
         return GenericWebhookAdapter(
             api_url=api_url,
             api_key=os.environ.get("VIDEO_API_KEY"),
@@ -232,7 +236,10 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
-    load_env_file(ROOT / args.env_file)
+    env_file_path = Path(args.env_file)
+    if not env_file_path.is_absolute():
+        env_file_path = ROOT / env_file_path
+    load_env_file(env_file_path)
 
     spec_value = args.spec or os.environ.get("VIDEO_SCENE_SPEC", str(DEFAULT_SCENE_SPEC))
     output_dir_value = args.output_dir or os.environ.get("VIDEO_OUTPUT_DIR", str(DEFAULT_OUTPUT_DIR))
