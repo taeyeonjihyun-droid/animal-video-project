@@ -105,11 +105,12 @@ def generate_image_prompts(output_override: str | None = None):
             }
         )
 
-    out = ROOT / (
+    selected_output = Path(
         output_override
         if output_override
         else cfg.get("image_prompt_output", "output/scene_image_prompts.json")
     )
+    out = selected_output if selected_output.is_absolute() else ROOT / selected_output
     out.parent.mkdir(parents=True, exist_ok=True)
     payload = {
         "project_title": project_title,
