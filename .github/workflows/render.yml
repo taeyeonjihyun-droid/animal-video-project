@@ -120,7 +120,7 @@ jobs:
           echo "프롬프트 결과 확인: output/scene_image_prompts.json"
 
       - name: Upload rendered video
-        if: ${{ env.RUN_MODE == 'render' || env.RUN_MODE == 'both' || env.RUN_MODE == 'batch' }}
+        if: ${{ (env.RUN_MODE == 'render' || env.RUN_MODE == 'both' || env.RUN_MODE == 'batch') && success() }}
         uses: actions/upload-artifact@v4
         with:
           name: rendered-animal-video

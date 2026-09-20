@@ -84,6 +84,13 @@ def with_batch_index_suffix(output_path: str, index: int) -> str:
     return str(base_output.with_name(f"{stem}_{index:02d}{suffix}"))
 
 
+def validate_output_value(cfg: dict) -> str:
+    output_value = cfg.get("output", "output/animal_trip.mp4")
+    if not isinstance(output_value, str) or not output_value.strip():
+        raise ValueError("output은 비어 있지 않은 문자열 경로여야 합니다.")
+    return output_value
+
+
 def parse_args() -> argparse.Namespace:
     """Parse CLI flags and return an argparse.Namespace for execution mode selection."""
     parser = argparse.ArgumentParser(description="Animal video renderer / scene prompt generator")
@@ -503,7 +510,7 @@ def build_video_from_config(cfg: dict) -> None:
     else:
         print(f"[안내] BGM 없음: {bgm_path}. 무음 영상으로 생성합니다.")
 
-    out = ROOT / cfg.get("output", "output/animal_trip.mp4")
+    out = ROOT / validate_output_value(cfg)
     out.parent.mkdir(parents=True, exist_ok=True)
     print(f"[렌더링 시작] {out}")
     final.write_videofile(
@@ -555,7 +562,7 @@ def build_batch_videos(batch_file_override: str | None = None) -> None:
         has_output_override = isinstance(overrides, dict) and "output" in overrides
         if isinstance(overrides, dict) and overrides:
             cfg = deep_merge_dict(cfg, overrides)
-        effective_output_value = str(cfg.get("output", "output/animal_trip.mp4"))
+        effective_output_value = validate_output_value(cfg)
         final_output_value = effective_output_value
         if total_jobs > 1 and final_output_value in used_outputs:
             suffix_index = index
