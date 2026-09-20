@@ -37,7 +37,7 @@ jobs:
       - name: Clean previous outputs
         run: |
           mkdir -p output
-          find output -mindepth 1 -delete
+          find output -mindepth 1 ! -name ".gitkeep" -delete
 
       - name: Render video
         run: python main.py
