@@ -29,6 +29,7 @@ def load_config() -> dict:
 
 
 def parse_args():
+    """Parse CLI flags for rendering mode and scene image prompt generation mode."""
     parser = argparse.ArgumentParser(description="Animal video renderer / scene prompt generator")
     parser.add_argument(
         "--generate-image-prompts",
@@ -78,6 +79,8 @@ def generate_image_prompts(output_override: str | None = None):
     vcfg = cfg.get("video", {})
     width = int(vcfg.get("width", 1280))
     height = int(vcfg.get("height", 720))
+    if width <= 0 or height <= 0:
+        raise ValueError("video.width와 video.height는 1 이상의 값이어야 합니다.")
 
     scenes = cfg.get("scenes", [])
     project_title = str(cfg.get("project_title", ""))
