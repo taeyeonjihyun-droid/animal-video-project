@@ -137,9 +137,8 @@ jobs:
                 continue
               p = Path(raw)
               if not p.is_absolute():
-                p = (repo_root / p).resolve()
-              else:
-                p = p.resolve()
+                raise SystemExit(f"배치 출력 경로는 절대경로여야 합니다: {raw}")
+              p = p.resolve()
               try:
                 p.relative_to(repo_root)
               except ValueError:

@@ -308,6 +308,12 @@ class BatchFeatureTests(unittest.TestCase):
         rendered_cfg = mocked_build.call_args.args[0]
         expected = Path("local.mp4")
         self.assertEqual(Path(rendered_cfg["output"]), expected)
+        expected_output_path = (batch_dir / "local.mp4").resolve()
+        self.assertEqual(mocked_build.call_args.kwargs["output_path"], expected_output_path)
+        self.assertEqual(
+            mocked_build.call_args.kwargs["output_base_dir"],
+            batch_dir.resolve(),
+        )
 
 
 if __name__ == "__main__":
