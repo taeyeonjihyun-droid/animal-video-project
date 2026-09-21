@@ -77,9 +77,14 @@ def deep_merge_dict(base: dict, overrides: dict) -> dict:
     return merged
 
 
-def with_batch_index_suffix(output_path: Path, index: int) -> Path:
+def with_batch_index_suffix(
+    output_path: Path,
+    index: int,
+    *,
+    default_suffix: str = ".mp4",
+) -> Path:
     base_output = output_path
-    suffix = base_output.suffix or ".mp4"
+    suffix = base_output.suffix or default_suffix
     stem = base_output.stem or "animal_trip"
     return base_output.with_name(f"{stem}_{index:02d}{suffix}")
 
@@ -95,6 +100,20 @@ def validate_output_value(cfg: dict, *, base_dir: Path) -> Path:
     )
     if output_path.suffix.lower() != ".mp4":
         raise ValueError("output 파일 확장자는 .mp4여야 합니다.")
+    return output_path
+
+
+def validate_prompt_output_value(cfg: dict, *, base_dir: Path) -> Path:
+    output_value = cfg.get("image_prompt_output", "output/scene_image_prompts.json")
+    if not isinstance(output_value, str) or not output_value.strip():
+        raise ValueError("image_prompt_output은 비어 있지 않은 문자열 경로여야 합니다.")
+    output_path = resolve_repo_relative_path(
+        output_value,
+        base_dir=base_dir,
+        must_exist=False,
+    )
+    if output_path.suffix.lower() != ".json":
+        raise ValueError("image_prompt_output 파일 확장자는 .json이어야 합니다.")
     return output_path
 
 
@@ -118,6 +137,11 @@ def parse_args() -> argparse.Namespace:
         help="배치 설정 파일을 읽어 여러 편 영상을 순차 렌더링합니다.",
     )
     parser.add_argument(
+        "--batch-generate-image-prompts",
+        action="store_true",
+        help="배치 설정 파일을 읽어 각 작업별 장면 프롬프트 JSON을 순차 생성합니다.",
+    )
+    parser.add_argument(
         "--batch-file",
         type=str,
         default=None,
@@ -126,10 +150,14 @@ def parse_args() -> argparse.Namespace:
     args = parser.parse_args()
     if args.prompts_output and not args.generate_image_prompts:
         parser.error("--prompts-output는 --generate-image-prompts와 함께 사용해야 합니다.")
-    if args.batch_file and not args.batch_render:
-        parser.error("--batch-file은 --batch-render와 함께 사용해야 합니다.")
+    if args.batch_file and not (args.batch_render or args.batch_generate_image_prompts):
+        parser.error("--batch-file은 --batch-render 또는 --batch-generate-image-prompts와 함께 사용해야 합니다.")
     if args.batch_render and args.generate_image_prompts:
         parser.error("--batch-render와 --generate-image-prompts는 동시에 사용할 수 없습니다.")
+    if args.batch_generate_image_prompts and args.generate_image_prompts:
+        parser.error("--batch-generate-image-prompts와 --generate-image-prompts는 동시에 사용할 수 없습니다.")
+    if args.batch_generate_image_prompts and args.batch_render:
+        parser.error("--batch-generate-image-prompts와 --batch-render는 동시에 사용할 수 없습니다.")
     return args
 
 
@@ -604,10 +632,70 @@ def build_batch_videos(batch_file_override: str | None = None) -> None:
     print("[배치 완료] 모든 영상 렌더링이 끝났습니다.")
 
 
+def build_batch_image_prompts(batch_file_override: str | None = None) -> None:
+    batch_file = batch_file_override or "batch_config.json"
+    batch_path = resolve_repo_relative_path(
+        batch_file,
+        base_dir=Path.cwd().resolve(),
+        must_exist=True,
+    )
+    batch_cfg = load_json(batch_path)
+    if not isinstance(batch_cfg, dict):
+        raise ValueError("배치 설정 파일 최상위는 객체(dict)여야 합니다.")
+    jobs = batch_cfg.get("jobs")
+    if not isinstance(jobs, list) or not jobs:
+        raise ValueError("배치 설정 파일에는 1개 이상의 jobs 목록이 필요합니다.")
+
+    print(f"[배치 프롬프트 시작] {batch_path} / 총 {len(jobs)}개")
+    reserved_outputs: set[Path] = set()
+    planned_jobs: list[tuple[str, Path, dict, Path, Path]] = []
+    for index, job in enumerate(jobs, start=1):
+        if not isinstance(job, dict):
+            raise ValueError(f"jobs[{index}]는 객체(dict)여야 합니다.")
+        config_rel = job.get("config")
+        if not isinstance(config_rel, str) or not config_rel.strip():
+            raise ValueError(f"jobs[{index}].config는 필수 문자열입니다.")
+
+        config_path = resolve_repo_relative_path(
+            config_rel,
+            base_dir=batch_path.parent,
+            must_exist=True,
+        )
+        cfg = load_config_from_path(config_path)
+        has_overrides = "overrides" in job
+        overrides = job.get("overrides", {})
+        if has_overrides and not isinstance(overrides, dict):
+            raise ValueError(f"jobs[{index}].overrides는 객체(dict)여야 합니다.")
+        if isinstance(overrides, dict) and overrides:
+            cfg = deep_merge_dict(cfg, overrides)
+        base_output = validate_prompt_output_value(cfg, base_dir=config_path.parent)
+        final_output_value = base_output
+        suffix_index = 2
+        while final_output_value in reserved_outputs or final_output_value.exists():
+            final_output_value = with_batch_index_suffix(base_output, suffix_index, default_suffix=".json")
+            suffix_index += 1
+        reserved_outputs.add(final_output_value)
+        name = str(job.get("name", f"batch-{index:02d}"))
+        planned_jobs.append((name, config_path, cfg, config_path.parent, final_output_value))
+
+    for index, (name, config_path, cfg, output_base_dir, final_output_value) in enumerate(planned_jobs, start=1):
+        try:
+            cfg["image_prompt_output"] = str(final_output_value.relative_to(output_base_dir))
+        except ValueError:
+            cfg["image_prompt_output"] = str(final_output_value)
+        print(f"[배치 프롬프트 작업 {index}/{len(jobs)}] {name} ({config_path})")
+        print(f"[배치 프롬프트 출력 예정] {final_output_value}")
+        generate_image_prompts_from_config(cfg, output_override=str(final_output_value))
+        print(f"[배치 프롬프트 출력] {final_output_value}")
+    print("[배치 프롬프트 완료] 모든 프롬프트 생성이 끝났습니다.")
+
+
 if __name__ == "__main__":
     args = parse_args()
     if args.batch_render:
         build_batch_videos(args.batch_file)
+    elif args.batch_generate_image_prompts:
+        build_batch_image_prompts(args.batch_file)
     elif args.generate_image_prompts:
         generate_image_prompts(args.prompts_output)
     else:

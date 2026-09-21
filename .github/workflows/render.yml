@@ -13,8 +13,9 @@ on:
           - prompts
           - both
           - batch
+          - batch-prompts
       batch_file:
-        description: "배치 설정 JSON 경로 (run_mode=batch일 때 사용)"
+        description: "배치 설정 JSON 경로 (run_mode=batch 또는 batch-prompts일 때 사용)"
         required: false
         default: "batch_config.json"
         type: string
@@ -23,10 +24,10 @@ permissions:
   contents: read
 
 env:
-  RUN_MODE: ${{ contains(fromJSON('["render","prompts","both","batch"]'), github.event.inputs.run_mode) && github.event.inputs.run_mode || 'render' }}
+  RUN_MODE: ${{ contains(fromJSON('["render","prompts","both","batch","batch-prompts"]'), github.event.inputs.run_mode) && github.event.inputs.run_mode || 'render' }}
 
 concurrency:
-  group: render-${{ github.workflow }}-${{ github.ref }}-${{ contains(fromJSON('["render","prompts","both","batch"]'), github.event.inputs.run_mode) && github.event.inputs.run_mode || 'render' }}
+  group: render-${{ github.workflow }}-${{ github.ref }}-${{ contains(fromJSON('["render","prompts","both","batch","batch-prompts"]'), github.event.inputs.run_mode) && github.event.inputs.run_mode || 'render' }}
   cancel-in-progress: true
 
 jobs:
@@ -74,6 +75,15 @@ jobs:
         run: |
           set -o pipefail
           python main.py --batch-render --batch-file "${{ github.event.inputs.batch_file }}" 2>&1 | tee output/batch_render.log
+
+      - name: Generate batch prompts
+        id: batch_prompts
+        if: ${{ env.RUN_MODE == 'batch-prompts' }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          python main.py --batch-generate-image-prompts --batch-file "${{ github.event.inputs.batch_file }}" 2>&1 | tee output/batch_prompts.log
 
       - name: Summarize batch failure reason
         if: ${{ env.RUN_MODE == 'batch' && steps.batch_render.outcome == 'failure' }}
@@ -290,11 +300,139 @@ jobs:
             shutil.copy2(source, dest)
           PY
 
+      - name: Summarize batch prompts failure reason
+        if: ${{ env.RUN_MODE == 'batch-prompts' && steps.batch_prompts.outcome == 'failure' }}
+        shell: bash
+        run: |
+          echo "배치 프롬프트 생성 실패 원인 요약"
+          echo "## 배치 프롬프트 생성 실패 원인 요약" >> "$GITHUB_STEP_SUMMARY"
+          if [ -f output/batch_prompts.log ]; then
+            summary_lines="$(grep -E 'Traceback \(most recent call last\):|[A-Za-z_][A-Za-z0-9_.]*(Error|Exception):|오류|실패' output/batch_prompts.log | tail -n 20 || true)"
+            if [ -z "$summary_lines" ]; then
+              summary_lines="$(tail -n 40 output/batch_prompts.log || true)"
+            fi
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "\`\`\`text" >> "$GITHUB_STEP_SUMMARY"
+            echo "$summary_lines" >> "$GITHUB_STEP_SUMMARY"
+            echo "\`\`\`" >> "$GITHUB_STEP_SUMMARY"
+            echo "$summary_lines"
+          else
+            echo "batch_prompts.log 파일이 없어 상세 로그를 찾지 못했습니다." | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload batch prompts failure log
+        if: ${{ env.RUN_MODE == 'batch-prompts' && steps.batch_prompts.outcome == 'failure' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: batch-prompts-failure-log
+          path: output/batch_prompts.log
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Fail workflow for batch prompts error
+        if: ${{ env.RUN_MODE == 'batch-prompts' && steps.batch_prompts.outcome == 'failure' }}
+        run: |
+          echo "배치 프롬프트 생성 실패로 워크플로우를 종료합니다."
+          exit 1
+
       - name: Check generated prompts
         if: ${{ (env.RUN_MODE == 'prompts' || env.RUN_MODE == 'both') && success() }}
         run: |
           test -f output/scene_image_prompts.json
           echo "프롬프트 결과 확인: output/scene_image_prompts.json"
+
+      - name: Check batch generated prompts
+        if: ${{ env.RUN_MODE == 'batch-prompts' && success() }}
+        run: |
+          if [ ! -f output/batch_prompts.log ]; then
+            echo "배치 프롬프트 로그 파일이 없습니다: output/batch_prompts.log"
+            exit 1
+          fi
+          python - <<'PY'
+          from pathlib import Path
+
+          repo_root = Path(".").resolve()
+          log_path = Path("output/batch_prompts.log")
+          out_list = Path("output/prompt_files.txt")
+          seen = set()
+          files = []
+
+          for line in log_path.read_text(encoding="utf-8").splitlines():
+            prefix = "[배치 프롬프트 출력] "
+            if not line.startswith(prefix):
+              continue
+            raw = line[len(prefix):].strip()
+            if not raw:
+              continue
+            p = Path(raw)
+            if not p.is_absolute():
+              raise SystemExit(f"배치 프롬프트 출력 경로는 절대경로여야 합니다: {raw}")
+            p = p.resolve()
+            try:
+              p.relative_to(repo_root)
+            except ValueError:
+              raise SystemExit(f"배치 프롬프트 출력 경로가 저장소 범위를 벗어났습니다: {p}")
+            if not p.exists() or p.suffix.lower() != ".json":
+              raise SystemExit(f"배치 프롬프트 JSON 파일이 없거나 형식이 올바르지 않습니다: {p}")
+            key = str(p)
+            if key not in seen:
+              seen.add(key)
+              files.append(key)
+
+          if not files:
+            raise SystemExit("배치 프롬프트 로그에서 유효한 JSON 경로를 찾지 못했습니다.")
+          out_list.write_text("\n".join(files) + "\n", encoding="utf-8")
+          PY
+
+      - name: Collect batch prompt files for artifact upload
+        if: ${{ env.RUN_MODE == 'batch-prompts' && success() }}
+        run: |
+          python - <<'PY'
+          import shutil
+          from pathlib import Path
+
+          repo_root = Path(".").resolve()
+          target_root = Path("output/prompt_artifacts")
+          shutil.rmtree(target_root, ignore_errors=True)
+          target_root.mkdir(parents=True, exist_ok=True)
+          list_path = Path("output/prompt_files.txt")
+          if not list_path.exists():
+            raise SystemExit("배치 프롬프트 아티팩트 수집 실패: prompt_files.txt가 없습니다.")
+          used_destinations = set()
+
+          def with_suffix(path: Path, index: int) -> Path:
+            return path.with_name(f"{path.stem}_{index:02d}{path.suffix}")
+
+          for line in list_path.read_text(encoding="utf-8").splitlines():
+            raw = line.strip()
+            if not raw:
+              continue
+            source = Path(raw)
+            if not source.is_absolute():
+              source = (repo_root / source).resolve()
+            else:
+              source = source.resolve()
+            try:
+              rel = source.relative_to(repo_root)
+            except ValueError:
+              raise SystemExit(f"배치 프롬프트 아티팩트 수집 실패: 저장소 범위를 벗어난 경로입니다: {source}")
+            if rel.parts[:2] == ("output", "prompt_artifacts"):
+              continue
+            if not source.exists():
+              raise SystemExit(f"배치 프롬프트 아티팩트 수집 실패: 파일이 존재하지 않습니다: {source}")
+            if source.suffix.lower() != ".json":
+              raise SystemExit(f"배치 프롬프트 아티팩트 수집 실패: JSON 파일이 아닙니다: {source}")
+            artifact_rel = rel.relative_to("output") if rel.parts and rel.parts[0] == "output" else rel
+            base_dest = target_root / artifact_rel
+            dest = base_dest
+            suffix_index = 2
+            while str(dest) in used_destinations or dest.exists():
+              dest = with_suffix(base_dest, suffix_index)
+              suffix_index += 1
+            used_destinations.add(str(dest))
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, dest)
+          PY
 
       - name: Upload rendered video
         if: ${{ (env.RUN_MODE == 'render' || env.RUN_MODE == 'both' || env.RUN_MODE == 'batch') && success() }}
@@ -320,5 +458,14 @@ jobs:
         with:
           name: scene-image-prompts
           path: output/scene_image_prompts.json
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload generated prompts (batch)
+        if: ${{ env.RUN_MODE == 'batch-prompts' && success() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: batch-scene-image-prompts
+          path: output/prompt_artifacts/**/*
           if-no-files-found: error
           retention-days: 7

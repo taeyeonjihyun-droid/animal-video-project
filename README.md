@@ -55,10 +55,12 @@ animal_trip_video_project/
    - `prompts`: 장면 프롬프트 JSON 생성
    - `both`: 프롬프트 생성 + 영상 렌더링
    - `batch`: 배치 설정 파일 기준 여러 영상 순차 렌더링
+   - `batch-prompts`: 배치 설정 파일 기준 각 job의 프롬프트 JSON만 순차 생성
 5. 실행할 브랜치를 확인하고 **Run workflow**를 누릅니다.
 6. 실행이 끝나면 run 상세 화면의 **Artifacts**에서 결과를 다운로드합니다.
    - 영상: `rendered-animal-video`
    - 프롬프트: `scene-image-prompts`
+   - 배치 프롬프트: `batch-scene-image-prompts` (batch-prompts 모드 성공 시)
    - 배치 ZIP: `batch-rendered-videos-zip` (batch 모드 성공 시)
    - 배치 모드 사용 시 `batch_file` 입력(기본 `batch_config.json`)으로 파일 경로를 지정할 수 있습니다.
 
@@ -188,6 +190,13 @@ GitHub Actions에서 배치 실행:
    - `rendered-animal-video`: `render`/`both` 모드에서는 단일 MP4, `batch` 모드에서는 `output/` 접두사를 제거한 정규화 상대경로 구조의 여러 MP4 파일
    - `batch-rendered-videos-zip`: 배치 결과 MP4 ZIP 묶음
 5. 실패 시 run 요약 화면에 **배치 실패 원인 요약 로그**가 자동으로 출력되며, `batch-failure-log` 아티팩트로 원본 로그를 받을 수 있습니다.
+
+GitHub Actions에서 배치 프롬프트만 생성:
+
+1. **Actions** → **Render animal video (수동 실행)** → **Run workflow**
+2. `run_mode`를 `batch-prompts`로 선택
+3. 필요하면 `batch_file` 입력값을 수정(예: `configs/batch_week1.json`)
+4. 완료 후 **Artifacts**에서 `batch-scene-image-prompts` 다운로드
 
 옵션:
 - `--batch-file`을 생략하면 기본값으로 `batch_config.json`을 사용합니다.
