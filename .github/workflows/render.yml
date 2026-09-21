@@ -234,7 +234,9 @@ jobs:
           zip_path = output_dir / "batch_videos.zip"
           with ZipFile(zip_path, "w", compression=ZIP_DEFLATED) as zf:
             for f in files:
-              zf.write(f, f.relative_to(repo_root))
+              rel = f.relative_to(repo_root)
+              arcname = rel.relative_to("output") if rel.parts and rel.parts[0] == "output" else rel
+              zf.write(f, arcname)
 
           print(f"ZIP 생성 완료: {zip_path} ({len(files)} files)")
           PY
@@ -274,7 +276,8 @@ jobs:
               raise SystemExit(f"렌더 아티팩트 수집 실패: 파일이 존재하지 않습니다: {source}")
             if source.suffix.lower() != ".mp4":
               raise SystemExit(f"렌더 아티팩트 수집 실패: MP4 파일이 아닙니다: {source}")
-            base_dest = target_root / rel
+            artifact_rel = rel.relative_to("output") if rel.parts and rel.parts[0] == "output" else rel
+            base_dest = target_root / artifact_rel
             dest = base_dest
             suffix_index = 2
             while str(dest) in used_destinations or dest.exists():
