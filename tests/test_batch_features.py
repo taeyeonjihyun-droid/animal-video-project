@@ -239,6 +239,26 @@ class BatchFeatureTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             main.build_batch_videos(rel_batch_path)
 
+    def test_non_mp4_output_is_rejected(self):
+        batch_dir = self.tmp_dir / "bad-output-ext"
+        cfg_path = batch_dir / "episode.json"
+        batch_path = batch_dir / "batch.json"
+        self._write_json(
+            cfg_path,
+            {
+                "project_title": "테스트",
+                "subtitle": "테스트",
+                "video": {"width": 320, "height": 180, "fps": 12, "fade_seconds": 0.1},
+                "output": "output/test.mov",
+                "scenes": [{"source": "assets/images/x.png", "caption": "x", "duration": 0.3, "zoom": 1.0}],
+            },
+        )
+        self._write_json(batch_path, {"jobs": [{"config": "episode.json"}]})
+
+        rel_batch_path = batch_path.relative_to(main.ROOT).as_posix()
+        with self.assertRaises(ValueError):
+            main.build_batch_videos(rel_batch_path)
+
     def test_nested_config_relative_output_is_resolved_from_config_dir(self):
         batch_dir = self.tmp_dir / "nested-output"
         cfg_path = batch_dir / "episode.json"

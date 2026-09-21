@@ -267,6 +267,8 @@ jobs:
               rel = source.relative_to(repo_root)
             except ValueError:
               raise SystemExit(f"렌더 아티팩트 수집 실패: 저장소 범위를 벗어난 경로입니다: {source}")
+            if rel.parts[:2] == ("output", "render_artifacts"):
+              continue
             if not source.exists():
               raise SystemExit(f"렌더 아티팩트 수집 실패: 파일이 존재하지 않습니다: {source}")
             if source.suffix.lower() != ".mp4":

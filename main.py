@@ -88,11 +88,14 @@ def validate_output_value(cfg: dict, *, base_dir: Path) -> Path:
     output_value = cfg.get("output", "output/animal_trip.mp4")
     if not isinstance(output_value, str) or not output_value.strip():
         raise ValueError("output은 비어 있지 않은 문자열 경로여야 합니다.")
-    return resolve_repo_relative_path(
+    output_path = resolve_repo_relative_path(
         output_value,
         base_dir=base_dir,
         must_exist=False,
     )
+    if output_path.suffix.lower() != ".mp4":
+        raise ValueError("output 파일 확장자는 .mp4여야 합니다.")
+    return output_path
 
 
 def parse_args() -> argparse.Namespace:
