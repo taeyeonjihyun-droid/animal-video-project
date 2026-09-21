@@ -59,6 +59,7 @@ animal_trip_video_project/
 6. 실행이 끝나면 run 상세 화면의 **Artifacts**에서 결과를 다운로드합니다.
    - 영상: `rendered-animal-video`
    - 프롬프트: `scene-image-prompts`
+   - 배치 ZIP: `batch-rendered-videos-zip` (batch 모드 성공 시)
    - 배치 모드 사용 시 `batch_file` 입력(기본 `batch_config.json`)으로 파일 경로를 지정할 수 있습니다.
 
 참고:

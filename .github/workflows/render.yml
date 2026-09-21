@@ -119,6 +119,7 @@ jobs:
             echo "output/ 하위에서 렌더링된 MP4를 찾지 못했습니다."
             exit 1
           fi
+          printf "%s\n" "${files[@]}" > output/rendered_files.txt
           printf "렌더링 결과:\n%s\n" "${files[@]}"
 
       - name: Create batch zip artifact
@@ -129,9 +130,17 @@ jobs:
           from zipfile import ZipFile, ZIP_DEFLATED
 
           output_dir = Path("output")
-          files = sorted(output_dir.rglob("*.mp4"))
+          list_path = output_dir / "rendered_files.txt"
+          if not list_path.exists():
+            raise SystemExit("배치 ZIP 생성 실패: rendered_files.txt가 없습니다.")
+
+          files = []
+          for line in list_path.read_text(encoding="utf-8").splitlines():
+            p = Path(line.strip())
+            if p and p.exists() and p.suffix.lower() == ".mp4":
+              files.append(p)
           if not files:
-            raise SystemExit("배치 ZIP 생성 실패: MP4 파일이 없습니다.")
+            raise SystemExit("배치 ZIP 생성 실패: 유효한 MP4 목록이 없습니다.")
 
           zip_path = output_dir / "batch_videos.zip"
           with ZipFile(zip_path, "w", compression=ZIP_DEFLATED) as zf:
