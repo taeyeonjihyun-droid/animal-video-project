@@ -25,7 +25,7 @@ from moviepy import (
 
 ROOT = Path(__file__).resolve().parent
 CONFIG_PATH = ROOT / "config.json"
-BATCH_SUMMARY_SCHEMA_VERSION = "1.1"
+BATCH_SUMMARY_SCHEMA_VERSION = "1.2"
 
 
 def load_config() -> dict:
@@ -180,6 +180,8 @@ def write_batch_summary_report(
     failure_count: int,
     failed_jobs: list[str],
     retry_successes: list[dict[str, Any]],
+    job_results: list[dict[str, Any]],
+    stopped_on_failure: bool,
     duration_seconds: float,
 ) -> None:
     print(
@@ -197,6 +199,8 @@ def write_batch_summary_report(
         "failure_count": failure_count,
         "failed_jobs": failed_jobs,
         "retry_successes": retry_successes,
+        "job_results": job_results,
+        "stopped_on_failure": stopped_on_failure,
         "duration_seconds": round(duration_seconds, 3),
         "generated_at": datetime.now(UTC).isoformat(),
     }
@@ -739,6 +743,7 @@ def build_batch_videos(
     failure_count = 0
     failed_jobs: list[str] = []
     retry_successes: list[dict[str, Any]] = []
+    job_results: list[dict[str, Any]] = []
     start_time = time.perf_counter()
     last_error: Exception | None = None
     for index, (name, config_path, cfg, output_base_dir, final_output_value) in enumerate(planned_jobs, start=1):
@@ -749,7 +754,9 @@ def build_batch_videos(
         print(f"[배치 작업 {index}/{len(jobs)}] {name} ({config_path})")
         print(f"[배치 출력 예정] {final_output_value}")
         max_attempts = retry_failed + 1
+        attempts_used = 0
         for attempt in range(1, max_attempts + 1):
+            attempts_used = attempt
             print(f"[배치 시도] {name} attempt {attempt}/{max_attempts}")
             try:
                 build_video_from_config(cfg, output_base_dir=output_base_dir, output_path=final_output_value)
@@ -758,12 +765,32 @@ def build_batch_videos(
                         "job": name,
                         "succeeded_on_attempt": attempt,
                     })
+                job_results.append({
+                    "job": name,
+                    "status": "success",
+                    "attempts_used": attempts_used,
+                    "max_attempts": max_attempts,
+                    "retried": attempts_used > 1,
+                    "succeeded_on_attempt": attempts_used,
+                    "output_path": str(final_output_value),
+                    "error": None,
+                })
                 break
             except Exception as exc:
                 if attempt >= max_attempts:
                     last_error = exc
                     failure_count += 1
                     failed_jobs.append(name)
+                    job_results.append({
+                        "job": name,
+                        "status": "failure",
+                        "attempts_used": attempts_used,
+                        "max_attempts": max_attempts,
+                        "retried": max_attempts > 1,
+                        "succeeded_on_attempt": None,
+                        "output_path": str(final_output_value),
+                        "error": str(exc),
+                    })
                     break
                 print(f"[배치 재시도] {name}: {exc}")
         if last_error is not None:
@@ -780,6 +807,8 @@ def build_batch_videos(
         failure_count=failure_count,
         failed_jobs=failed_jobs,
         retry_successes=retry_successes,
+        job_results=job_results,
+        stopped_on_failure=last_error is not None,
         duration_seconds=duration_seconds,
     )
     if last_error is not None:
@@ -861,6 +890,7 @@ def build_batch_image_prompts(
     failure_count = 0
     failed_jobs: list[str] = []
     retry_successes: list[dict[str, Any]] = []
+    job_results: list[dict[str, Any]] = []
     start_time = time.perf_counter()
     last_error: Exception | None = None
     for index, (name, config_path, cfg, output_base_dir, final_output_value) in enumerate(planned_jobs, start=1):
@@ -871,7 +901,9 @@ def build_batch_image_prompts(
         print(f"[배치 프롬프트 작업 {index}/{len(jobs)}] {name} ({config_path})")
         print(f"[배치 프롬프트 출력 예정] {final_output_value}")
         max_attempts = retry_failed + 1
+        attempts_used = 0
         for attempt in range(1, max_attempts + 1):
+            attempts_used = attempt
             print(f"[배치 프롬프트 시도] {name} attempt {attempt}/{max_attempts}")
             try:
                 generate_image_prompts_from_config(cfg, output_override=str(final_output_value))
@@ -880,12 +912,32 @@ def build_batch_image_prompts(
                         "job": name,
                         "succeeded_on_attempt": attempt,
                     })
+                job_results.append({
+                    "job": name,
+                    "status": "success",
+                    "attempts_used": attempts_used,
+                    "max_attempts": max_attempts,
+                    "retried": attempts_used > 1,
+                    "succeeded_on_attempt": attempts_used,
+                    "output_path": str(final_output_value),
+                    "error": None,
+                })
                 break
             except Exception as exc:
                 if attempt >= max_attempts:
                     last_error = exc
                     failure_count += 1
                     failed_jobs.append(name)
+                    job_results.append({
+                        "job": name,
+                        "status": "failure",
+                        "attempts_used": attempts_used,
+                        "max_attempts": max_attempts,
+                        "retried": max_attempts > 1,
+                        "succeeded_on_attempt": None,
+                        "output_path": str(final_output_value),
+                        "error": str(exc),
+                    })
                     break
                 print(f"[배치 프롬프트 재시도] {name}: {exc}")
         if last_error is not None:
@@ -902,6 +954,8 @@ def build_batch_image_prompts(
         failure_count=failure_count,
         failed_jobs=failed_jobs,
         retry_successes=retry_successes,
+        job_results=job_results,
+        stopped_on_failure=last_error is not None,
         duration_seconds=duration_seconds,
     )
     if last_error is not None:

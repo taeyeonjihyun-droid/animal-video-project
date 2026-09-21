@@ -242,8 +242,10 @@ GitHub Actions에서 배치 프롬프트+렌더링 함께 실행:
 - `--batch-file` 경로는 명령 실행 위치(현재 디렉터리) 기준 상대 경로이며, 프로젝트 폴더 내부 파일만 허용됩니다.
 - `--retry-failed`는 배치 작업 실패 시 job별 재시도 횟수를 지정합니다(0 이상의 정수).
 - `--summary-report`를 지정하면 배치 실행 시간/성공 개수/실패 개수 요약 JSON을 저장합니다.
-  - 고정 스키마 버전 필드: `schema_version` (현재 `1.1`)
+  - 고정 스키마 버전 필드: `schema_version` (현재 `1.2`)
   - 재시도 성공 결과 필드: `retry_successes` (`job`, `succeeded_on_attempt`)
+  - job 단위 실행 결과 필드: `job_results` (`job`, `status`, `attempts_used`, `max_attempts`, `retried`, `succeeded_on_attempt`, `output_path`, `error`)
+  - 중도 중단 여부 필드: `stopped_on_failure`
 - `prompt_filename_pattern`을 지정하면 `batch-prompts` 모드에서 파일명 규칙을 커스터마이즈할 수 있습니다(파일명만 허용, `.json` 자동 보정).
 - `overrides`는 각 작업의 설정을 덮어쓸 때 사용합니다(예: `output`, `project_title`, `subtitle`).
 - `jobs[].config` 경로는 **배치 파일 위치 기준 상대 경로**로 해석됩니다.

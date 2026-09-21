@@ -485,12 +485,16 @@ class BatchFeatureTests(unittest.TestCase):
             main.build_batch_videos(rel_batch_path, summary_report_path=rel_report_path)
 
         report = json.loads(report_path.read_text(encoding="utf-8"))
-        self.assertEqual(report["schema_version"], "1.1")
+        self.assertEqual(report["schema_version"], "1.2")
         self.assertEqual(report["mode"], "batch-render")
         self.assertEqual(report["total_jobs"], 1)
         self.assertEqual(report["success_count"], 1)
         self.assertEqual(report["failure_count"], 0)
         self.assertEqual(report["retry_successes"], [])
+        self.assertEqual(report["stopped_on_failure"], False)
+        self.assertEqual(len(report["job_results"]), 1)
+        self.assertEqual(report["job_results"][0]["status"], "success")
+        self.assertEqual(report["job_results"][0]["attempts_used"], 1)
         self.assertIn("duration_seconds", report)
 
     def test_batch_prompts_summary_report_is_created(self):
@@ -516,12 +520,16 @@ class BatchFeatureTests(unittest.TestCase):
             main.build_batch_image_prompts(rel_batch_path, summary_report_path=rel_report_path)
 
         report = json.loads(report_path.read_text(encoding="utf-8"))
-        self.assertEqual(report["schema_version"], "1.1")
+        self.assertEqual(report["schema_version"], "1.2")
         self.assertEqual(report["mode"], "batch-prompts")
         self.assertEqual(report["total_jobs"], 1)
         self.assertEqual(report["success_count"], 1)
         self.assertEqual(report["failure_count"], 0)
         self.assertEqual(report["retry_successes"], [])
+        self.assertEqual(report["stopped_on_failure"], False)
+        self.assertEqual(len(report["job_results"]), 1)
+        self.assertEqual(report["job_results"][0]["status"], "success")
+        self.assertEqual(report["job_results"][0]["attempts_used"], 1)
         self.assertIn("duration_seconds", report)
 
     def test_batch_render_summary_includes_retry_success_attempt(self):
@@ -551,6 +559,51 @@ class BatchFeatureTests(unittest.TestCase):
         self.assertEqual(
             report["retry_successes"],
             [{"job": "retry-job", "succeeded_on_attempt": 2}],
+        )
+        self.assertEqual(report["job_results"][0]["status"], "success")
+        self.assertEqual(report["job_results"][0]["attempts_used"], 2)
+        self.assertEqual(report["job_results"][0]["retried"], True)
+
+    def test_batch_render_summary_includes_failure_job_result(self):
+        batch_dir = self.tmp_dir / "batch-summary-failure-render"
+        cfg_path = batch_dir / "episode.json"
+        batch_path = batch_dir / "batch.json"
+        report_path = batch_dir / "output" / "failure_render_summary.json"
+        self._write_json(
+            cfg_path,
+            {
+                "project_title": "테스트",
+                "subtitle": "테스트",
+                "video": {"width": 320, "height": 180, "fps": 12, "fade_seconds": 0.1},
+                "output": "output/test.mp4",
+                "scenes": [{"source": "assets/images/x.png", "caption": "x", "duration": 0.3, "zoom": 1.0}],
+            },
+        )
+        self._write_json(batch_path, {"jobs": [{"name": "fail-job", "config": "episode.json"}]})
+
+        rel_batch_path = batch_path.relative_to(main.ROOT).as_posix()
+        rel_report_path = report_path.relative_to(main.ROOT).as_posix()
+        with patch("main.build_video_from_config") as mocked_build:
+            mocked_build.side_effect = RuntimeError("always fail")
+            with self.assertRaises(RuntimeError):
+                main.build_batch_videos(rel_batch_path, retry_failed=1, summary_report_path=rel_report_path)
+
+        report = json.loads(report_path.read_text(encoding="utf-8"))
+        self.assertEqual(report["failure_count"], 1)
+        self.assertEqual(report["failed_jobs"], ["fail-job"])
+        self.assertEqual(report["stopped_on_failure"], True)
+        self.assertEqual(
+            report["job_results"][0],
+            {
+                "job": "fail-job",
+                "status": "failure",
+                "attempts_used": 2,
+                "max_attempts": 2,
+                "retried": True,
+                "succeeded_on_attempt": None,
+                "output_path": str((batch_dir / "output" / "test.mp4").resolve()),
+                "error": "always fail",
+            },
         )
 
 
