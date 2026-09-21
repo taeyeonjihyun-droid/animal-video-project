@@ -178,20 +178,58 @@ jobs:
           print(f"ZIP 생성 완료: {zip_path} ({len(files)} files)")
           PY
 
+      - name: Collect batch rendered files for artifact upload
+        if: ${{ env.RUN_MODE == 'batch' && success() }}
+        run: |
+          python - <<'PY'
+          import shutil
+          from pathlib import Path
+
+          repo_root = Path(".").resolve()
+          target_root = Path("output/batch_render_files")
+          target_root.mkdir(parents=True, exist_ok=True)
+          list_path = Path("output/rendered_files.txt")
+          if not list_path.exists():
+            raise SystemExit("배치 아티팩트 수집 실패: rendered_files.txt가 없습니다.")
+
+          for line in list_path.read_text(encoding="utf-8").splitlines():
+            raw = line.strip()
+            if not raw:
+              continue
+            source = Path(raw)
+            if not source.is_absolute():
+              source = (repo_root / source).resolve()
+            else:
+              source = source.resolve()
+            rel = source.relative_to(repo_root)
+            dest = target_root / rel
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, dest)
+          PY
+
       - name: Check generated prompts
         if: ${{ (env.RUN_MODE == 'prompts' || env.RUN_MODE == 'both') && success() }}
         run: |
           test -f output/scene_image_prompts.json
           echo "프롬프트 결과 확인: output/scene_image_prompts.json"
 
-      - name: Upload rendered video
-        if: ${{ (env.RUN_MODE == 'render' || env.RUN_MODE == 'both' || env.RUN_MODE == 'batch') && success() }}
+      - name: Upload rendered video (render/both)
+        if: ${{ (env.RUN_MODE == 'render' || env.RUN_MODE == 'both') && success() }}
         uses: actions/upload-artifact@v4
         with:
           name: rendered-animal-video
           path: |
             output/*.mp4
             output/**/*.mp4
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload rendered video (batch)
+        if: ${{ env.RUN_MODE == 'batch' && success() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: rendered-animal-video
+          path: output/batch_render_files/**/*
           if-no-files-found: error
           retention-days: 7
 

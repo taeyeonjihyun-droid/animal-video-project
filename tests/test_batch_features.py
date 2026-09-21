@@ -122,8 +122,10 @@ class BatchFeatureTests(unittest.TestCase):
         self.assertEqual(mocked_build.call_count, 2)
         first_output = mocked_build.call_args_list[0].args[0]["output"]
         second_output = mocked_build.call_args_list[1].args[0]["output"]
-        self.assertEqual(first_output, "output/test.mp4")
-        self.assertEqual(second_output, "output/test_02.mp4")
+        expected_first = (batch_dir / "output/test.mp4").relative_to(main.ROOT)
+        expected_second = (batch_dir / "output/test_02.mp4").relative_to(main.ROOT)
+        self.assertEqual(Path(first_output), expected_first)
+        self.assertEqual(Path(second_output), expected_second)
 
     def test_explicit_output_override_is_preserved(self):
         batch_dir = self.tmp_dir / "explicit"
@@ -156,8 +158,10 @@ class BatchFeatureTests(unittest.TestCase):
         self.assertEqual(mocked_build.call_count, 2)
         first_output = mocked_build.call_args_list[0].args[0]["output"]
         second_output = mocked_build.call_args_list[1].args[0]["output"]
-        self.assertEqual(first_output, "output/test.mp4")
-        self.assertEqual(second_output, "output/test_02.mp4")
+        expected_first = (batch_dir / "output/test.mp4").relative_to(main.ROOT)
+        expected_second = (batch_dir / "output/test_02.mp4").relative_to(main.ROOT)
+        self.assertEqual(Path(first_output), expected_first)
+        self.assertEqual(Path(second_output), expected_second)
 
     def test_duplicate_explicit_outputs_are_renamed_for_uniqueness(self):
         batch_dir = self.tmp_dir / "explicit-dup"
@@ -190,8 +194,10 @@ class BatchFeatureTests(unittest.TestCase):
         self.assertEqual(mocked_build.call_count, 2)
         first_output = mocked_build.call_args_list[0].args[0]["output"]
         second_output = mocked_build.call_args_list[1].args[0]["output"]
-        self.assertEqual(first_output, "output/same.mp4")
-        self.assertEqual(second_output, "output/same_02.mp4")
+        expected_first = (batch_dir / "output/same.mp4").relative_to(main.ROOT)
+        expected_second = (batch_dir / "output/same_02.mp4").relative_to(main.ROOT)
+        self.assertEqual(Path(first_output), expected_first)
+        self.assertEqual(Path(second_output), expected_second)
 
     def test_invalid_output_type_is_rejected(self):
         batch_dir = self.tmp_dir / "bad-output"
@@ -232,6 +238,30 @@ class BatchFeatureTests(unittest.TestCase):
         rel_batch_path = batch_path.relative_to(main.ROOT).as_posix()
         with self.assertRaises(ValueError):
             main.build_batch_videos(rel_batch_path)
+
+    def test_nested_config_relative_output_is_resolved_from_config_dir(self):
+        batch_dir = self.tmp_dir / "nested-output"
+        cfg_path = batch_dir / "episode.json"
+        batch_path = batch_dir / "batch.json"
+        self._write_json(
+            cfg_path,
+            {
+                "project_title": "테스트",
+                "subtitle": "테스트",
+                "video": {"width": 320, "height": 180, "fps": 12, "fade_seconds": 0.1},
+                "output": "local.mp4",
+                "scenes": [{"source": "assets/images/x.png", "caption": "x", "duration": 0.3, "zoom": 1.0}],
+            },
+        )
+        self._write_json(batch_path, {"jobs": [{"config": "episode.json"}]})
+
+        rel_batch_path = batch_path.relative_to(main.ROOT).as_posix()
+        with patch("main.build_video_from_config") as mocked_build:
+            main.build_batch_videos(rel_batch_path)
+
+        rendered_cfg = mocked_build.call_args.args[0]
+        expected = (batch_dir / "local.mp4").relative_to(main.ROOT)
+        self.assertEqual(Path(rendered_cfg["output"]), expected)
 
 
 if __name__ == "__main__":

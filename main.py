@@ -84,13 +84,13 @@ def with_batch_index_suffix(output_path: Path, index: int) -> Path:
     return base_output.with_name(f"{stem}_{index:02d}{suffix}")
 
 
-def validate_output_value(cfg: dict) -> Path:
+def validate_output_value(cfg: dict, *, base_dir: Path) -> Path:
     output_value = cfg.get("output", "output/animal_trip.mp4")
     if not isinstance(output_value, str) or not output_value.strip():
         raise ValueError("output은 비어 있지 않은 문자열 경로여야 합니다.")
     return resolve_repo_relative_path(
         output_value,
-        base_dir=ROOT,
+        base_dir=base_dir,
         must_exist=False,
     )
 
@@ -514,7 +514,7 @@ def build_video_from_config(cfg: dict) -> None:
     else:
         print(f"[안내] BGM 없음: {bgm_path}. 무음 영상으로 생성합니다.")
 
-    out = validate_output_value(cfg)
+    out = validate_output_value(cfg, base_dir=ROOT)
     out.parent.mkdir(parents=True, exist_ok=True)
     print(f"[렌더링 시작] {out}")
     final.write_videofile(
@@ -565,7 +565,7 @@ def build_batch_videos(batch_file_override: str | None = None) -> None:
             raise ValueError(f"jobs[{index}].overrides는 객체(dict)여야 합니다.")
         if isinstance(overrides, dict) and overrides:
             cfg = deep_merge_dict(cfg, overrides)
-        effective_output_value = validate_output_value(cfg)
+        effective_output_value = validate_output_value(cfg, base_dir=config_path.parent)
         final_output_value = effective_output_value
         if total_jobs > 1 and final_output_value in used_outputs:
             suffix_index = index
