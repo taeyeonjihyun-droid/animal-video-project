@@ -584,8 +584,8 @@ def build_batch_videos(batch_file_override: str | None = None) -> None:
         except ValueError:
             cfg["output"] = str(final_output_value)
         print(f"[배치 작업 {index}/{len(jobs)}] {name} ({config_path})")
-        build_video_from_config(cfg, output_base_dir=output_base_dir)
         print(f"[배치 출력] {final_output_value}")
+        build_video_from_config(cfg, output_base_dir=output_base_dir)
     print("[배치 완료] 모든 영상 렌더링이 끝났습니다.")
 
 

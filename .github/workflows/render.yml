@@ -254,6 +254,7 @@ jobs:
           list_path = Path("output/rendered_files.txt")
           if not list_path.exists():
             raise SystemExit("렌더 아티팩트 수집 실패: rendered_files.txt가 없습니다.")
+          used_destinations = set()
 
           for line in list_path.read_text(encoding="utf-8").splitlines():
             raw = line.strip()
@@ -275,6 +276,11 @@ jobs:
             if source.suffix.lower() != ".mp4":
               raise SystemExit(f"렌더 아티팩트 수집 실패: MP4 파일이 아닙니다: {source}")
             dest = target_root / rel
+            suffix_index = 2
+            while str(dest) in used_destinations or dest.exists():
+              dest = dest.with_name(f"{dest.stem}_{suffix_index:02d}{dest.suffix}")
+              suffix_index += 1
+            used_destinations.add(str(dest))
             dest.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(source, dest)
           PY
