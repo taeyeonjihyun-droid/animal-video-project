@@ -119,21 +119,56 @@ jobs:
               echo "배치 로그 파일이 없습니다: output/batch_render.log"
               exit 1
             fi
-            mapfile -t files < <(grep '^\[배치 출력\] ' output/batch_render.log | sed 's/^\[배치 출력\] //')
+            python - <<'PY'
+            from pathlib import Path
+
+            repo_root = Path(".").resolve()
+            log_path = Path("output/batch_render.log")
+            out_list = Path("output/rendered_files.txt")
+            seen = set()
+            files = []
+
+            for line in log_path.read_text(encoding="utf-8").splitlines():
+              prefix = "[배치 출력] "
+              if not line.startswith(prefix):
+                continue
+              raw = line[len(prefix):].strip()
+              if not raw:
+                continue
+              p = Path(raw)
+              if not p.is_absolute():
+                p = (repo_root / p).resolve()
+              else:
+                p = p.resolve()
+              try:
+                p.relative_to(repo_root)
+              except ValueError:
+                raise SystemExit(f"배치 출력 경로가 저장소 범위를 벗어났습니다: {p}")
+              if not p.exists() or p.suffix.lower() != ".mp4":
+                raise SystemExit(f"배치 출력 MP4 파일이 없거나 형식이 올바르지 않습니다: {p}")
+              key = str(p)
+              if key not in seen:
+                seen.add(key)
+                files.append(key)
+
+            if not files:
+              raise SystemExit("배치 출력 로그에서 유효한 MP4 경로를 찾지 못했습니다.")
+            out_list.write_text("\n".join(files) + "\n", encoding="utf-8")
+            PY
+            mapfile -t files < output/rendered_files.txt
           else
             mapfile -t files < <(find output -type f -name '*.mp4')
+            printf "%s\n" "${files[@]}" > output/rendered_files.txt
           fi
           if [ ${#files[@]} -eq 0 ]; then
             echo "output/ 하위에서 렌더링된 MP4를 찾지 못했습니다."
             exit 1
           fi
-          : > output/rendered_files.txt
           for file in "${files[@]}"; do
             if [ ! -f "$file" ]; then
               echo "렌더링 결과 파일을 찾지 못했습니다: $file"
               exit 1
             fi
-            printf "%s\n" "$file" >> output/rendered_files.txt
           done
           printf "렌더링 결과:\n%s\n" "${files[@]}"
 
@@ -201,7 +236,10 @@ jobs:
               source = (repo_root / source).resolve()
             else:
               source = source.resolve()
-            rel = source.relative_to(repo_root)
+            try:
+              rel = source.relative_to(repo_root)
+            except ValueError:
+              raise SystemExit(f"배치 아티팩트 수집 실패: 저장소 범위를 벗어난 경로입니다: {source}")
             dest = target_root / rel
             dest.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(source, dest)
