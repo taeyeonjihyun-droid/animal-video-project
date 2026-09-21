@@ -251,6 +251,88 @@ GitHub Actions에서 배치 프롬프트+렌더링 함께 실행:
 - `jobs[].config` 경로는 **배치 파일 위치 기준 상대 경로**로 해석됩니다.
 - 여러 작업에서 최종 출력 경로가 중복되거나, 이미 같은 경로의 파일이 존재하면(기본값/`overrides.output` 포함) 파일명에 `_02`처럼 번호를 붙여 덮어쓰기를 방지합니다.
 
+### `batch-execution-summary` JSON 예시
+
+성공 케이스(1개 job 성공):
+
+```json
+{
+  "schema_version": "1.2",
+  "mode": "batch-render",
+  "batch_file": "/home/runner/work/animal-video-project/animal-video-project/batch_config.json",
+  "total_jobs": 1,
+  "success_count": 1,
+  "failure_count": 0,
+  "failed_jobs": [],
+  "retry_successes": [],
+  "job_results": [
+    {
+      "job": "batch-01",
+      "status": "success",
+      "attempts_used": 1,
+      "max_attempts": 1,
+      "retried": false,
+      "succeeded_on_attempt": 1,
+      "output_path": "/home/runner/work/animal-video-project/animal-video-project/output/test.mp4",
+      "error": null
+    }
+  ],
+  "stopped_on_failure": false,
+  "duration_seconds": 0.123,
+  "generated_at": "2026-09-21T13:00:00+00:00"
+}
+```
+
+실패 케이스(1개 job 실패):
+
+```json
+{
+  "schema_version": "1.2",
+  "mode": "batch-render",
+  "batch_file": "/home/runner/work/animal-video-project/animal-video-project/batch_config.json",
+  "total_jobs": 1,
+  "success_count": 0,
+  "failure_count": 1,
+  "failed_jobs": ["fail-job"],
+  "retry_successes": [],
+  "job_results": [
+    {
+      "job": "fail-job",
+      "status": "failure",
+      "attempts_used": 2,
+      "max_attempts": 2,
+      "retried": true,
+      "succeeded_on_attempt": null,
+      "output_path": "/home/runner/work/animal-video-project/animal-video-project/output/test.mp4",
+      "error": "always fail"
+    }
+  ],
+  "stopped_on_failure": true,
+  "duration_seconds": 0.456,
+  "generated_at": "2026-09-21T13:00:10+00:00"
+}
+```
+
+### 스키마 마이그레이션 노트 (1.1 → 1.2)
+
+- `schema_version` 값이 `1.2`로 변경되었습니다.
+- 신규 필드가 추가되었습니다.
+  - `job_results`: job 단위 최종 실행 결과 상세
+  - `stopped_on_failure`: 실패로 배치가 중단되었는지 여부
+- 기존 `retry_successes` 필드는 유지되며, 재시도 후 성공한 job만 별도 요약합니다.
+
+### batch-both 수동 실행 테스트 시 아티팩트 샘플 캡처 형식
+
+아래와 같이 **Run 상세 > Artifacts**에서 확인할 수 있습니다.
+
+```text
+rendered-animal-video
+batch-rendered-videos-zip
+batch-scene-image-prompts
+batch-execution-summary
+batch-run-logs
+```
+
 ## 저작권 주의
 
 다른 유튜브 영상의 실제 영상/음원/자막을 그대로 복사하지 말고,  
