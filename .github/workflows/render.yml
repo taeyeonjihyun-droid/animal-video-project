@@ -275,10 +275,11 @@ jobs:
               raise SystemExit(f"렌더 아티팩트 수집 실패: 파일이 존재하지 않습니다: {source}")
             if source.suffix.lower() != ".mp4":
               raise SystemExit(f"렌더 아티팩트 수집 실패: MP4 파일이 아닙니다: {source}")
-            dest = target_root / rel
+            base_dest = target_root / rel
+            dest = base_dest
             suffix_index = 2
             while str(dest) in used_destinations or dest.exists():
-              dest = dest.with_name(f"{dest.stem}_{suffix_index:02d}{dest.suffix}")
+              dest = base_dest.with_name(f"{base_dest.stem}_{suffix_index:02d}{base_dest.suffix}")
               suffix_index += 1
             used_destinations.add(str(dest))
             dest.parent.mkdir(parents=True, exist_ok=True)

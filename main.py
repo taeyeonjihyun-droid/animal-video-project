@@ -471,7 +471,12 @@ def build_video():
     build_video_from_config(cfg)
 
 
-def build_video_from_config(cfg: dict, *, output_base_dir: Path = ROOT) -> None:
+def build_video_from_config(
+    cfg: dict,
+    *,
+    output_base_dir: Path = ROOT,
+    output_path: Path | None = None,
+) -> None:
     vcfg = cfg["video"]
     size = (int(vcfg["width"]), int(vcfg["height"]))
     fps = int(vcfg.get("fps", 30))
@@ -517,7 +522,9 @@ def build_video_from_config(cfg: dict, *, output_base_dir: Path = ROOT) -> None:
     else:
         print(f"[안내] BGM 없음: {bgm_path}. 무음 영상으로 생성합니다.")
 
-    out = validate_output_value(cfg, base_dir=output_base_dir)
+    out = output_path if output_path is not None else validate_output_value(cfg, base_dir=output_base_dir)
+    if out.suffix.lower() != ".mp4":
+        raise ValueError("output 파일 확장자는 .mp4여야 합니다.")
     out.parent.mkdir(parents=True, exist_ok=True)
     print(f"[렌더링 시작] {out}")
     final.write_videofile(
@@ -585,7 +592,7 @@ def build_batch_videos(batch_file_override: str | None = None) -> None:
             cfg["output"] = str(final_output_value)
         print(f"[배치 작업 {index}/{len(jobs)}] {name} ({config_path})")
         print(f"[배치 출력] {final_output_value}")
-        build_video_from_config(cfg, output_base_dir=output_base_dir)
+        build_video_from_config(cfg, output_base_dir=output_base_dir, output_path=final_output_value)
     print("[배치 완료] 모든 영상 렌더링이 끝났습니다.")
 
 
