@@ -114,12 +114,27 @@ jobs:
         if: ${{ (env.RUN_MODE == 'render' || env.RUN_MODE == 'both' || env.RUN_MODE == 'batch') && success() }}
         shell: bash
         run: |
-          mapfile -t files < <(find output -type f -name '*.mp4')
+          if [ "${RUN_MODE}" = "batch" ]; then
+            if [ ! -f output/batch_render.log ]; then
+              echo "배치 로그 파일이 없습니다: output/batch_render.log"
+              exit 1
+            fi
+            mapfile -t files < <(grep '^\[배치 출력\] ' output/batch_render.log | sed 's/^\[배치 출력\] //')
+          else
+            mapfile -t files < <(find output -type f -name '*.mp4')
+          fi
           if [ ${#files[@]} -eq 0 ]; then
             echo "output/ 하위에서 렌더링된 MP4를 찾지 못했습니다."
             exit 1
           fi
-          printf "%s\n" "${files[@]}" > output/rendered_files.txt
+          : > output/rendered_files.txt
+          for file in "${files[@]}"; do
+            if [ ! -f "$file" ]; then
+              echo "렌더링 결과 파일을 찾지 못했습니다: $file"
+              exit 1
+            fi
+            printf "%s\n" "$file" >> output/rendered_files.txt
+          done
           printf "렌더링 결과:\n%s\n" "${files[@]}"
 
       - name: Create batch zip artifact
@@ -129,6 +144,7 @@ jobs:
           from pathlib import Path
           from zipfile import ZipFile, ZIP_DEFLATED
 
+          repo_root = Path(".").resolve()
           output_dir = Path("output")
           list_path = output_dir / "rendered_files.txt"
           if not list_path.exists():
@@ -136,16 +152,28 @@ jobs:
 
           files = []
           for line in list_path.read_text(encoding="utf-8").splitlines():
-            p = Path(line.strip())
-            if p and p.exists() and p.suffix.lower() == ".mp4":
-              files.append(p)
+            raw = line.strip()
+            if not raw:
+              continue
+            p = Path(raw)
+            if not p.is_absolute():
+              p = (repo_root / p).resolve()
+            else:
+              p = p.resolve()
+            if not p.exists() or p.suffix.lower() != ".mp4":
+              continue
+            try:
+              p.relative_to(repo_root)
+            except ValueError:
+              continue
+            files.append(p)
           if not files:
             raise SystemExit("배치 ZIP 생성 실패: 유효한 MP4 목록이 없습니다.")
 
           zip_path = output_dir / "batch_videos.zip"
           with ZipFile(zip_path, "w", compression=ZIP_DEFLATED) as zf:
             for f in files:
-              zf.write(f, f.relative_to(output_dir))
+              zf.write(f, f.relative_to(repo_root))
 
           print(f"ZIP 생성 완료: {zip_path} ({len(files)} files)")
           PY

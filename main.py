@@ -77,18 +77,22 @@ def deep_merge_dict(base: dict, overrides: dict) -> dict:
     return merged
 
 
-def with_batch_index_suffix(output_path: str, index: int) -> str:
-    base_output = Path(output_path)
+def with_batch_index_suffix(output_path: Path, index: int) -> Path:
+    base_output = output_path
     suffix = base_output.suffix or ".mp4"
     stem = base_output.stem or "animal_trip"
-    return str(base_output.with_name(f"{stem}_{index:02d}{suffix}"))
+    return base_output.with_name(f"{stem}_{index:02d}{suffix}")
 
 
-def validate_output_value(cfg: dict) -> str:
+def validate_output_value(cfg: dict) -> Path:
     output_value = cfg.get("output", "output/animal_trip.mp4")
     if not isinstance(output_value, str) or not output_value.strip():
         raise ValueError("output은 비어 있지 않은 문자열 경로여야 합니다.")
-    return output_value
+    return resolve_repo_relative_path(
+        output_value,
+        base_dir=ROOT,
+        must_exist=False,
+    )
 
 
 def parse_args() -> argparse.Namespace:
@@ -510,7 +514,7 @@ def build_video_from_config(cfg: dict) -> None:
     else:
         print(f"[안내] BGM 없음: {bgm_path}. 무음 영상으로 생성합니다.")
 
-    out = ROOT / validate_output_value(cfg)
+    out = validate_output_value(cfg)
     out.parent.mkdir(parents=True, exist_ok=True)
     print(f"[렌더링 시작] {out}")
     final.write_videofile(
@@ -541,7 +545,7 @@ def build_batch_videos(batch_file_override: str | None = None) -> None:
 
     print(f"[배치 시작] {batch_path} / 총 {len(jobs)}개")
     total_jobs = len(jobs)
-    used_outputs: set[str] = set()
+    used_outputs: set[Path] = set()
     for index, job in enumerate(jobs, start=1):
         if not isinstance(job, dict):
             raise ValueError(f"jobs[{index}]는 객체(dict)여야 합니다.")
@@ -559,7 +563,6 @@ def build_batch_videos(batch_file_override: str | None = None) -> None:
         overrides = job.get("overrides", {})
         if has_overrides and not isinstance(overrides, dict):
             raise ValueError(f"jobs[{index}].overrides는 객체(dict)여야 합니다.")
-        has_output_override = isinstance(overrides, dict) and "output" in overrides
         if isinstance(overrides, dict) and overrides:
             cfg = deep_merge_dict(cfg, overrides)
         effective_output_value = validate_output_value(cfg)
@@ -571,12 +574,13 @@ def build_batch_videos(batch_file_override: str | None = None) -> None:
                 suffix_index += 1
                 candidate = with_batch_index_suffix(effective_output_value, suffix_index)
             final_output_value = candidate
-        cfg["output"] = final_output_value
+        cfg["output"] = str(final_output_value.relative_to(ROOT))
         used_outputs.add(final_output_value)
 
         name = str(job.get("name", f"batch-{index:02d}"))
         print(f"[배치 작업 {index}/{len(jobs)}] {name} ({config_path})")
         build_video_from_config(cfg)
+        print(f"[배치 출력] {cfg['output']}")
     print("[배치 완료] 모든 영상 렌더링이 끝났습니다.")
 
 
