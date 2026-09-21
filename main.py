@@ -147,6 +147,12 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="배치 설정 JSON 경로 (현재 디렉터리 기준 상대 경로, 프로젝트 내부 파일만 허용, 기본: batch_config.json)",
     )
+    parser.add_argument(
+        "--retry-failed",
+        type=int,
+        default=0,
+        help="배치 작업 실패 시 job별 재시도 횟수 (기본: 0)",
+    )
     args = parser.parse_args()
     if args.prompts_output and not args.generate_image_prompts:
         parser.error("--prompts-output는 --generate-image-prompts와 함께 사용해야 합니다.")
@@ -158,6 +164,10 @@ def parse_args() -> argparse.Namespace:
         parser.error("--batch-generate-image-prompts와 --generate-image-prompts는 동시에 사용할 수 없습니다.")
     if args.batch_generate_image_prompts and args.batch_render:
         parser.error("--batch-generate-image-prompts와 --batch-render는 동시에 사용할 수 없습니다.")
+    if args.retry_failed < 0:
+        parser.error("--retry-failed는 0 이상의 정수여야 합니다.")
+    if args.retry_failed > 0 and not (args.batch_render or args.batch_generate_image_prompts):
+        parser.error("--retry-failed는 --batch-render 또는 --batch-generate-image-prompts와 함께 사용해야 합니다.")
     return args
 
 
@@ -574,7 +584,7 @@ def build_video_from_config(
     print(f"[완료] {out}")
 
 
-def build_batch_videos(batch_file_override: str | None = None) -> None:
+def build_batch_videos(batch_file_override: str | None = None, *, retry_failed: int = 0) -> None:
     batch_file = batch_file_override or "batch_config.json"
     batch_path = resolve_repo_relative_path(
         batch_file,
@@ -627,12 +637,21 @@ def build_batch_videos(batch_file_override: str | None = None) -> None:
             cfg["output"] = str(final_output_value)
         print(f"[배치 작업 {index}/{len(jobs)}] {name} ({config_path})")
         print(f"[배치 출력 예정] {final_output_value}")
-        build_video_from_config(cfg, output_base_dir=output_base_dir, output_path=final_output_value)
+        max_attempts = retry_failed + 1
+        for attempt in range(1, max_attempts + 1):
+            print(f"[배치 시도] {name} attempt {attempt}/{max_attempts}")
+            try:
+                build_video_from_config(cfg, output_base_dir=output_base_dir, output_path=final_output_value)
+                break
+            except Exception as exc:
+                if attempt >= max_attempts:
+                    raise
+                print(f"[배치 재시도] {name}: {exc}")
         print(f"[배치 출력] {final_output_value}")
     print("[배치 완료] 모든 영상 렌더링이 끝났습니다.")
 
 
-def build_batch_image_prompts(batch_file_override: str | None = None) -> None:
+def build_batch_image_prompts(batch_file_override: str | None = None, *, retry_failed: int = 0) -> None:
     batch_file = batch_file_override or "batch_config.json"
     batch_path = resolve_repo_relative_path(
         batch_file,
@@ -685,7 +704,16 @@ def build_batch_image_prompts(batch_file_override: str | None = None) -> None:
             cfg["image_prompt_output"] = str(final_output_value)
         print(f"[배치 프롬프트 작업 {index}/{len(jobs)}] {name} ({config_path})")
         print(f"[배치 프롬프트 출력 예정] {final_output_value}")
-        generate_image_prompts_from_config(cfg, output_override=str(final_output_value))
+        max_attempts = retry_failed + 1
+        for attempt in range(1, max_attempts + 1):
+            print(f"[배치 프롬프트 시도] {name} attempt {attempt}/{max_attempts}")
+            try:
+                generate_image_prompts_from_config(cfg, output_override=str(final_output_value))
+                break
+            except Exception as exc:
+                if attempt >= max_attempts:
+                    raise
+                print(f"[배치 프롬프트 재시도] {name}: {exc}")
         print(f"[배치 프롬프트 출력] {final_output_value}")
     print("[배치 프롬프트 완료] 모든 프롬프트 생성이 끝났습니다.")
 
@@ -693,9 +721,9 @@ def build_batch_image_prompts(batch_file_override: str | None = None) -> None:
 if __name__ == "__main__":
     args = parse_args()
     if args.batch_render:
-        build_batch_videos(args.batch_file)
+        build_batch_videos(args.batch_file, retry_failed=args.retry_failed)
     elif args.batch_generate_image_prompts:
-        build_batch_image_prompts(args.batch_file)
+        build_batch_image_prompts(args.batch_file, retry_failed=args.retry_failed)
     elif args.generate_image_prompts:
         generate_image_prompts(args.prompts_output)
     else:

@@ -364,6 +364,52 @@ class BatchFeatureTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             main.build_batch_image_prompts(rel_batch_path)
 
+    def test_batch_render_retries_failed_job(self):
+        batch_dir = self.tmp_dir / "batch-retry-render"
+        cfg_path = batch_dir / "episode.json"
+        batch_path = batch_dir / "batch.json"
+        self._write_json(
+            cfg_path,
+            {
+                "project_title": "테스트",
+                "subtitle": "테스트",
+                "video": {"width": 320, "height": 180, "fps": 12, "fade_seconds": 0.1},
+                "output": "output/test.mp4",
+                "scenes": [{"source": "assets/images/x.png", "caption": "x", "duration": 0.3, "zoom": 1.0}],
+            },
+        )
+        self._write_json(batch_path, {"jobs": [{"config": "episode.json"}]})
+
+        rel_batch_path = batch_path.relative_to(main.ROOT).as_posix()
+        with patch("main.build_video_from_config") as mocked_build:
+            mocked_build.side_effect = [RuntimeError("first fail"), None]
+            main.build_batch_videos(rel_batch_path, retry_failed=1)
+
+        self.assertEqual(mocked_build.call_count, 2)
+
+    def test_batch_prompts_retries_failed_job(self):
+        batch_dir = self.tmp_dir / "batch-retry-prompts"
+        cfg_path = batch_dir / "episode.json"
+        batch_path = batch_dir / "batch.json"
+        self._write_json(
+            cfg_path,
+            {
+                "project_title": "테스트",
+                "subtitle": "테스트",
+                "video": {"width": 320, "height": 180, "fps": 12, "fade_seconds": 0.1},
+                "image_prompt_output": "output/prompts.json",
+                "scenes": [{"source": "assets/images/x.png", "caption": "x", "duration": 0.3, "zoom": 1.0}],
+            },
+        )
+        self._write_json(batch_path, {"jobs": [{"config": "episode.json"}]})
+
+        rel_batch_path = batch_path.relative_to(main.ROOT).as_posix()
+        with patch("main.generate_image_prompts_from_config") as mocked_prompts:
+            mocked_prompts.side_effect = [RuntimeError("first fail"), None]
+            main.build_batch_image_prompts(rel_batch_path, retry_failed=1)
+
+        self.assertEqual(mocked_prompts.call_count, 2)
+
 
 if __name__ == "__main__":
     unittest.main()
