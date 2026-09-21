@@ -122,8 +122,8 @@ class BatchFeatureTests(unittest.TestCase):
         self.assertEqual(mocked_build.call_count, 2)
         first_output = mocked_build.call_args_list[0].args[0]["output"]
         second_output = mocked_build.call_args_list[1].args[0]["output"]
-        expected_first = (batch_dir / "output/test.mp4").relative_to(main.ROOT)
-        expected_second = (batch_dir / "output/test_02.mp4").relative_to(main.ROOT)
+        expected_first = Path("output/test.mp4")
+        expected_second = Path("output/test_02.mp4")
         self.assertEqual(Path(first_output), expected_first)
         self.assertEqual(Path(second_output), expected_second)
 
@@ -158,8 +158,8 @@ class BatchFeatureTests(unittest.TestCase):
         self.assertEqual(mocked_build.call_count, 2)
         first_output = mocked_build.call_args_list[0].args[0]["output"]
         second_output = mocked_build.call_args_list[1].args[0]["output"]
-        expected_first = (batch_dir / "output/test.mp4").relative_to(main.ROOT)
-        expected_second = (batch_dir / "output/test_02.mp4").relative_to(main.ROOT)
+        expected_first = Path("output/test.mp4")
+        expected_second = Path("output/test_02.mp4")
         self.assertEqual(Path(first_output), expected_first)
         self.assertEqual(Path(second_output), expected_second)
 
@@ -194,8 +194,8 @@ class BatchFeatureTests(unittest.TestCase):
         self.assertEqual(mocked_build.call_count, 2)
         first_output = mocked_build.call_args_list[0].args[0]["output"]
         second_output = mocked_build.call_args_list[1].args[0]["output"]
-        expected_first = (batch_dir / "output/same.mp4").relative_to(main.ROOT)
-        expected_second = (batch_dir / "output/same_02.mp4").relative_to(main.ROOT)
+        expected_first = Path("output/same.mp4")
+        expected_second = Path("output/same_02.mp4")
         self.assertEqual(Path(first_output), expected_first)
         self.assertEqual(Path(second_output), expected_second)
 
@@ -280,7 +280,7 @@ class BatchFeatureTests(unittest.TestCase):
             main.build_batch_videos(rel_batch_path)
 
         rendered_cfg = mocked_build.call_args.args[0]
-        expected = (batch_dir / "local.mp4").relative_to(main.ROOT)
+        expected = Path("local.mp4")
         self.assertEqual(Path(rendered_cfg["output"]), expected)
 
 

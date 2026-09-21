@@ -249,6 +249,7 @@ jobs:
 
           repo_root = Path(".").resolve()
           target_root = Path("output/render_artifacts")
+          shutil.rmtree(target_root, ignore_errors=True)
           target_root.mkdir(parents=True, exist_ok=True)
           list_path = Path("output/rendered_files.txt")
           if not list_path.exists():

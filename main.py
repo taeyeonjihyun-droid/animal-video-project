@@ -471,7 +471,7 @@ def build_video():
     build_video_from_config(cfg)
 
 
-def build_video_from_config(cfg: dict) -> None:
+def build_video_from_config(cfg: dict, *, output_base_dir: Path = ROOT) -> None:
     vcfg = cfg["video"]
     size = (int(vcfg["width"]), int(vcfg["height"]))
     fps = int(vcfg.get("fps", 30))
@@ -517,7 +517,7 @@ def build_video_from_config(cfg: dict) -> None:
     else:
         print(f"[안내] BGM 없음: {bgm_path}. 무음 영상으로 생성합니다.")
 
-    out = validate_output_value(cfg, base_dir=ROOT)
+    out = validate_output_value(cfg, base_dir=output_base_dir)
     out.parent.mkdir(parents=True, exist_ok=True)
     print(f"[렌더링 시작] {out}")
     final.write_videofile(
@@ -577,12 +577,15 @@ def build_batch_videos(batch_file_override: str | None = None) -> None:
                 suffix_index += 1
                 candidate = with_batch_index_suffix(effective_output_value, suffix_index)
             final_output_value = candidate
-        cfg["output"] = str(final_output_value.relative_to(ROOT))
+        try:
+            cfg["output"] = str(final_output_value.relative_to(config_path.parent))
+        except ValueError:
+            cfg["output"] = str(final_output_value)
         used_outputs.add(final_output_value)
 
         name = str(job.get("name", f"batch-{index:02d}"))
         print(f"[배치 작업 {index}/{len(jobs)}] {name} ({config_path})")
-        build_video_from_config(cfg)
+        build_video_from_config(cfg, output_base_dir=config_path.parent)
         print(f"[배치 출력] {cfg['output']}")
     print("[배치 완료] 모든 영상 렌더링이 끝났습니다.")
 
