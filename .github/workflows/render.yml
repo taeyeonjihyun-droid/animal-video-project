@@ -14,6 +14,7 @@ on:
           - both
           - batch
           - batch-prompts
+          - batch-both
       batch_file:
         description: "배치 설정 JSON 경로 (run_mode=batch 또는 batch-prompts일 때 사용)"
         required: false
@@ -42,10 +43,10 @@ permissions:
   contents: read
 
 env:
-  RUN_MODE: ${{ contains(fromJSON('["render","prompts","both","batch","batch-prompts"]'), github.event.inputs.run_mode) && github.event.inputs.run_mode || 'render' }}
+  RUN_MODE: ${{ contains(fromJSON('["render","prompts","both","batch","batch-prompts","batch-both"]'), github.event.inputs.run_mode) && github.event.inputs.run_mode || 'render' }}
 
 concurrency:
-  group: render-${{ github.workflow }}-${{ github.ref }}-${{ contains(fromJSON('["render","prompts","both","batch","batch-prompts"]'), github.event.inputs.run_mode) && github.event.inputs.run_mode || 'render' }}
+  group: render-${{ github.workflow }}-${{ github.ref }}-${{ contains(fromJSON('["render","prompts","both","batch","batch-prompts","batch-both"]'), github.event.inputs.run_mode) && github.event.inputs.run_mode || 'render' }}
   cancel-in-progress: true
 
 jobs:
@@ -87,7 +88,7 @@ jobs:
 
       - name: Render batch videos
         id: batch_render
-        if: ${{ env.RUN_MODE == 'batch' }}
+        if: ${{ env.RUN_MODE == 'batch' || env.RUN_MODE == 'batch-both' }}
         continue-on-error: true
         shell: bash
         run: |
@@ -100,7 +101,7 @@ jobs:
 
       - name: Generate batch prompts
         id: batch_prompts
-        if: ${{ env.RUN_MODE == 'batch-prompts' }}
+        if: ${{ env.RUN_MODE == 'batch-prompts' || env.RUN_MODE == 'batch-both' }}
         continue-on-error: true
         shell: bash
         run: |
@@ -112,7 +113,7 @@ jobs:
           python main.py --batch-generate-image-prompts --batch-file "${{ github.event.inputs.batch_file }}" --retry-failed "${{ github.event.inputs.batch_retry_count || '0' }}" ${SUMMARY_ARG} 2>&1 | tee output/batch_prompts.log
 
       - name: Summarize batch failure reason
-        if: ${{ env.RUN_MODE == 'batch' && steps.batch_render.outcome == 'failure' }}
+        if: ${{ (env.RUN_MODE == 'batch' || env.RUN_MODE == 'batch-both') && steps.batch_render.outcome == 'failure' }}
         shell: bash
         run: |
           echo "배치 렌더링 실패 원인 요약"
@@ -132,7 +133,7 @@ jobs:
           fi
 
       - name: Upload batch failure log
-        if: ${{ env.RUN_MODE == 'batch' && steps.batch_render.outcome == 'failure' }}
+        if: ${{ (env.RUN_MODE == 'batch' || env.RUN_MODE == 'batch-both') && steps.batch_render.outcome == 'failure' }}
         uses: actions/upload-artifact@v4
         with:
           name: batch-failure-log
@@ -147,10 +148,10 @@ jobs:
           exit 1
 
       - name: Check rendered videos
-        if: ${{ (env.RUN_MODE == 'render' || env.RUN_MODE == 'both' || env.RUN_MODE == 'batch') && success() }}
+        if: ${{ ((env.RUN_MODE == 'render' || env.RUN_MODE == 'both') && success()) || ((env.RUN_MODE == 'batch' || env.RUN_MODE == 'batch-both') && steps.batch_render.outcome == 'success') }}
         shell: bash
         run: |
-          if [ "${RUN_MODE}" = "batch" ]; then
+          if [ "${RUN_MODE}" = "batch" ] || [ "${RUN_MODE}" = "batch-both" ]; then
             if [ ! -f output/batch_render.log ]; then
               echo "배치 로그 파일이 없습니다: output/batch_render.log"
               exit 1
@@ -233,7 +234,7 @@ jobs:
           printf "렌더링 결과:\n%s\n" "${files[@]}"
 
       - name: Create batch zip artifact
-        if: ${{ env.RUN_MODE == 'batch' && success() }}
+        if: ${{ (env.RUN_MODE == 'batch' || env.RUN_MODE == 'batch-both') && steps.batch_render.outcome == 'success' }}
         run: |
           python - <<'PY'
           from pathlib import Path
@@ -278,7 +279,7 @@ jobs:
           PY
 
       - name: Collect rendered files for artifact upload
-        if: ${{ (env.RUN_MODE == 'render' || env.RUN_MODE == 'both' || env.RUN_MODE == 'batch') && success() }}
+        if: ${{ ((env.RUN_MODE == 'render' || env.RUN_MODE == 'both') && success()) || ((env.RUN_MODE == 'batch' || env.RUN_MODE == 'batch-both') && steps.batch_render.outcome == 'success') }}
         run: |
           python - <<'PY'
           import shutil
@@ -327,7 +328,7 @@ jobs:
           PY
 
       - name: Summarize batch prompts failure reason
-        if: ${{ env.RUN_MODE == 'batch-prompts' && steps.batch_prompts.outcome == 'failure' }}
+        if: ${{ (env.RUN_MODE == 'batch-prompts' || env.RUN_MODE == 'batch-both') && steps.batch_prompts.outcome == 'failure' }}
         shell: bash
         run: |
           echo "배치 프롬프트 생성 실패 원인 요약"
@@ -347,7 +348,7 @@ jobs:
           fi
 
       - name: Upload batch prompts failure log
-        if: ${{ env.RUN_MODE == 'batch-prompts' && steps.batch_prompts.outcome == 'failure' }}
+        if: ${{ (env.RUN_MODE == 'batch-prompts' || env.RUN_MODE == 'batch-both') && steps.batch_prompts.outcome == 'failure' }}
         uses: actions/upload-artifact@v4
         with:
           name: batch-prompts-failure-log
@@ -368,7 +369,7 @@ jobs:
           echo "프롬프트 결과 확인: output/scene_image_prompts.json"
 
       - name: Check batch generated prompts
-        if: ${{ env.RUN_MODE == 'batch-prompts' && success() }}
+        if: ${{ (env.RUN_MODE == 'batch-prompts' || env.RUN_MODE == 'batch-both') && steps.batch_prompts.outcome == 'success' }}
         run: |
           if [ ! -f output/batch_prompts.log ]; then
             echo "배치 프롬프트 로그 파일이 없습니다: output/batch_prompts.log"
@@ -411,7 +412,7 @@ jobs:
           PY
 
       - name: Collect batch prompt files for artifact upload
-        if: ${{ env.RUN_MODE == 'batch-prompts' && success() }}
+        if: ${{ (env.RUN_MODE == 'batch-prompts' || env.RUN_MODE == 'batch-both') && steps.batch_prompts.outcome == 'success' }}
         run: |
           python - <<'PY'
           import shutil
@@ -461,7 +462,7 @@ jobs:
           PY
 
       - name: Upload rendered video
-        if: ${{ (env.RUN_MODE == 'render' || env.RUN_MODE == 'both' || env.RUN_MODE == 'batch') && success() }}
+        if: ${{ ((env.RUN_MODE == 'render' || env.RUN_MODE == 'both') && success()) || ((env.RUN_MODE == 'batch' || env.RUN_MODE == 'batch-both') && steps.batch_render.outcome == 'success') }}
         uses: actions/upload-artifact@v4
         with:
           name: rendered-animal-video
@@ -470,7 +471,7 @@ jobs:
           retention-days: 7
 
       - name: Upload batch zip artifact
-        if: ${{ env.RUN_MODE == 'batch' && success() }}
+        if: ${{ (env.RUN_MODE == 'batch' || env.RUN_MODE == 'batch-both') && steps.batch_render.outcome == 'success' }}
         uses: actions/upload-artifact@v4
         with:
           name: batch-rendered-videos-zip
@@ -488,7 +489,7 @@ jobs:
           retention-days: 7
 
       - name: Upload generated prompts (batch)
-        if: ${{ env.RUN_MODE == 'batch-prompts' && success() }}
+        if: ${{ (env.RUN_MODE == 'batch-prompts' || env.RUN_MODE == 'batch-both') && steps.batch_prompts.outcome == 'success' }}
         uses: actions/upload-artifact@v4
         with:
           name: batch-scene-image-prompts
@@ -497,7 +498,7 @@ jobs:
           retention-days: 7
 
       - name: Upload batch summary report
-        if: ${{ (env.RUN_MODE == 'batch' || env.RUN_MODE == 'batch-prompts') && (github.event.inputs.batch_summary_report || 'true') == 'true' }}
+        if: ${{ (env.RUN_MODE == 'batch' || env.RUN_MODE == 'batch-prompts' || env.RUN_MODE == 'batch-both') && (github.event.inputs.batch_summary_report || 'true') == 'true' }}
         uses: actions/upload-artifact@v4
         with:
           name: batch-execution-summary
@@ -506,3 +507,20 @@ jobs:
             output/batch_prompts_summary.json
           if-no-files-found: ignore
           retention-days: 7
+
+      - name: Upload batch run logs
+        if: ${{ env.RUN_MODE == 'batch' || env.RUN_MODE == 'batch-prompts' || env.RUN_MODE == 'batch-both' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: batch-run-logs
+          path: |
+            output/batch_render.log
+            output/batch_prompts.log
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Fail workflow for batch-both error
+        if: ${{ env.RUN_MODE == 'batch-both' && (steps.batch_render.outcome == 'failure' || steps.batch_prompts.outcome == 'failure') }}
+        run: |
+          echo "batch-both 실행 중 실패가 발생해 워크플로우를 종료합니다."
+          exit 1

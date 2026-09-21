@@ -56,16 +56,18 @@ animal_trip_video_project/
    - `both`: 프롬프트 생성 + 영상 렌더링
    - `batch`: 배치 설정 파일 기준 여러 영상 순차 렌더링
    - `batch-prompts`: 배치 설정 파일 기준 각 job의 프롬프트 JSON만 순차 생성
+   - `batch-both`: 배치 설정 파일 기준 프롬프트 JSON 생성 + 영상 순차 렌더링
 5. 실행할 브랜치를 확인하고 **Run workflow**를 누릅니다.
 6. 실행이 끝나면 run 상세 화면의 **Artifacts**에서 결과를 다운로드합니다.
    - 영상: `rendered-animal-video`
    - 프롬프트: `scene-image-prompts`
-   - 배치 프롬프트: `batch-scene-image-prompts` (batch-prompts 모드 성공 시)
-   - 배치 ZIP: `batch-rendered-videos-zip` (batch 모드 성공 시)
-   - 배치 요약: `batch-execution-summary` (batch/batch-prompts에서 `batch_summary_report=true`일 때)
+   - 배치 프롬프트: `batch-scene-image-prompts` (batch-prompts/batch-both 모드 성공 시)
+   - 배치 ZIP: `batch-rendered-videos-zip` (batch/batch-both 모드 성공 시)
+   - 배치 요약: `batch-execution-summary` (batch/batch-prompts/batch-both에서 `batch_summary_report=true`일 때)
+   - 배치 로그: `batch-run-logs` (batch/batch-prompts/batch-both 실행 시)
    - 배치 모드 사용 시 `batch_file` 입력(기본 `batch_config.json`)으로 파일 경로를 지정할 수 있습니다.
-   - 배치 모드(`batch`, `batch-prompts`)에서는 `batch_retry_count`로 job별 실패 재시도 횟수(0~3)를 지정할 수 있습니다.
-   - 배치 모드(`batch`, `batch-prompts`)에서는 `batch_summary_report`로 실행 시간/성공 개수 요약 JSON 생성 여부를 선택할 수 있습니다.
+   - 배치 모드(`batch`, `batch-prompts`, `batch-both`)에서는 `batch_retry_count`로 job별 실패 재시도 횟수(0~3)를 지정할 수 있습니다.
+   - 배치 모드(`batch`, `batch-prompts`, `batch-both`)에서는 `batch_summary_report`로 실행 시간/성공 개수 요약 JSON 생성 여부를 선택할 수 있습니다.
 
 참고:
 - 실행 시간은 장면 수/길이에 따라 보통 몇 분 정도 걸릴 수 있습니다.
@@ -208,7 +210,7 @@ GitHub Actions에서 배치 실행:
 4. 필요하면 `batch_retry_count`를 설정(예: `2`)
 5. 필요하면 `batch_summary_report`를 설정(기본 `true`)
 6. 완료 후 **Artifacts**에서 결과 다운로드
-   - `rendered-animal-video`: `render`/`both` 모드에서는 단일 MP4, `batch` 모드에서는 `output/` 접두사를 제거한 정규화 상대경로 구조의 여러 MP4 파일
+   - `rendered-animal-video`: `render`/`both` 모드에서는 단일 MP4, `batch`/`batch-both` 모드에서는 `output/` 접두사를 제거한 정규화 상대경로 구조의 여러 MP4 파일
    - `batch-rendered-videos-zip`: 배치 결과 MP4 ZIP 묶음
 7. 실패 시 run 요약 화면에 **배치 실패 원인 요약 로그**가 자동으로 출력되며, `batch-failure-log` 아티팩트로 원본 로그를 받을 수 있습니다.
 
@@ -220,6 +222,20 @@ GitHub Actions에서 배치 프롬프트만 생성:
 4. 필요하면 `batch_retry_count`를 설정(예: `2`)
 5. 필요하면 `batch_summary_report`를 설정(기본 `true`)
 6. 완료 후 **Artifacts**에서 `batch-scene-image-prompts` 다운로드
+
+GitHub Actions에서 배치 프롬프트+렌더링 함께 실행:
+
+1. **Actions** → **Render animal video (수동 실행)** → **Run workflow**
+2. `run_mode`를 `batch-both`로 선택
+3. 필요하면 `batch_file` 입력값을 수정(예: `configs/batch_week1.json`)
+4. 필요하면 `batch_retry_count`를 설정(예: `2`)
+5. 필요하면 `batch_summary_report`를 설정(기본 `true`)
+6. 완료 후 **Artifacts**에서 아래 결과를 함께 다운로드
+   - `rendered-animal-video`
+   - `batch-rendered-videos-zip`
+   - `batch-scene-image-prompts`
+   - `batch-execution-summary` (`batch_summary_report=true`일 때)
+   - `batch-run-logs`
 
 옵션:
 - `--batch-file`을 생략하면 기본값으로 `batch_config.json`을 사용합니다.
