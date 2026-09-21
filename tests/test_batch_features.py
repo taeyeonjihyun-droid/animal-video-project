@@ -485,6 +485,7 @@ class BatchFeatureTests(unittest.TestCase):
             main.build_batch_videos(rel_batch_path, summary_report_path=rel_report_path)
 
         report = json.loads(report_path.read_text(encoding="utf-8"))
+        self.assertEqual(report["schema_version"], "1.0")
         self.assertEqual(report["mode"], "batch-render")
         self.assertEqual(report["total_jobs"], 1)
         self.assertEqual(report["success_count"], 1)
@@ -514,6 +515,7 @@ class BatchFeatureTests(unittest.TestCase):
             main.build_batch_image_prompts(rel_batch_path, summary_report_path=rel_report_path)
 
         report = json.loads(report_path.read_text(encoding="utf-8"))
+        self.assertEqual(report["schema_version"], "1.0")
         self.assertEqual(report["mode"], "batch-prompts")
         self.assertEqual(report["total_jobs"], 1)
         self.assertEqual(report["success_count"], 1)

@@ -25,6 +25,7 @@ from moviepy import (
 
 ROOT = Path(__file__).resolve().parent
 CONFIG_PATH = ROOT / "config.json"
+BATCH_SUMMARY_SCHEMA_VERSION = "1.0"
 
 
 def load_config() -> dict:
@@ -187,6 +188,7 @@ def write_batch_summary_report(
     if report_path is None:
         return
     payload = {
+        "schema_version": BATCH_SUMMARY_SCHEMA_VERSION,
         "mode": mode,
         "batch_file": str(batch_path),
         "total_jobs": total_jobs,
