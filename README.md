@@ -185,7 +185,7 @@ GitHub Actions에서 배치 실행:
 2. `run_mode`를 `batch`로 선택
 3. 필요하면 `batch_file` 입력값을 수정(예: `configs/batch_week1.json`)
 4. 완료 후 **Artifacts**에서 결과 다운로드
-   - `rendered-animal-video`: `render`/`both` 모드에서는 단일 MP4, `batch` 모드에서는 여러 MP4 파일
+   - `rendered-animal-video`: `render`/`both` 모드에서는 단일 MP4, `batch` 모드에서는 `output/` 접두사를 제거한 정규화 상대경로 구조의 여러 MP4 파일
    - `batch-rendered-videos-zip`: 배치 결과 MP4 ZIP 묶음
 5. 실패 시 run 요약 화면에 **배치 실패 원인 요약 로그**가 자동으로 출력되며, `batch-failure-log` 아티팩트로 원본 로그를 받을 수 있습니다.
 
