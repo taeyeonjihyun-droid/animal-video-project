@@ -522,7 +522,14 @@ def build_video_from_config(
     else:
         print(f"[안내] BGM 없음: {bgm_path}. 무음 영상으로 생성합니다.")
 
-    out = output_path if output_path is not None else validate_output_value(cfg, base_dir=output_base_dir)
+    if output_path is not None:
+        out = resolve_repo_relative_path(
+            str(output_path),
+            base_dir=output_base_dir,
+            must_exist=False,
+        )
+    else:
+        out = validate_output_value(cfg, base_dir=output_base_dir)
     if out.suffix.lower() != ".mp4":
         raise ValueError("output 파일 확장자는 .mp4여야 합니다.")
     out.parent.mkdir(parents=True, exist_ok=True)
