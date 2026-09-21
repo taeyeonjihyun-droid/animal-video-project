@@ -586,7 +586,7 @@ def build_batch_videos(batch_file_override: str | None = None) -> None:
         name = str(job.get("name", f"batch-{index:02d}"))
         print(f"[배치 작업 {index}/{len(jobs)}] {name} ({config_path})")
         build_video_from_config(cfg, output_base_dir=config_path.parent)
-        print(f"[배치 출력] {cfg['output']}")
+        print(f"[배치 출력] {final_output_value}")
     print("[배치 완료] 모든 영상 렌더링이 끝났습니다.")
 
 
