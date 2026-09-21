@@ -200,7 +200,11 @@ jobs:
             try:
               p.relative_to(repo_root)
             except ValueError:
-              continue
+              raise SystemExit(f"배치 ZIP 생성 실패: 저장소 범위를 벗어난 경로입니다: {p}")
+            if not p.exists():
+              raise SystemExit(f"배치 ZIP 생성 실패: 파일이 존재하지 않습니다: {p}")
+            if p.suffix.lower() != ".mp4":
+              raise SystemExit(f"배치 ZIP 생성 실패: MP4 파일이 아닙니다: {p}")
             files.append(p)
           if not files:
             raise SystemExit("배치 ZIP 생성 실패: 유효한 MP4 목록이 없습니다.")
@@ -240,6 +244,10 @@ jobs:
               rel = source.relative_to(repo_root)
             except ValueError:
               raise SystemExit(f"배치 아티팩트 수집 실패: 저장소 범위를 벗어난 경로입니다: {source}")
+            if not source.exists():
+              raise SystemExit(f"배치 아티팩트 수집 실패: 파일이 존재하지 않습니다: {source}")
+            if source.suffix.lower() != ".mp4":
+              raise SystemExit(f"배치 아티팩트 수집 실패: MP4 파일이 아닙니다: {source}")
             dest = target_root / rel
             dest.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(source, dest)
