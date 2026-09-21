@@ -121,6 +121,26 @@ jobs:
           fi
           printf "렌더링 결과:\n%s\n" "${files[@]}"
 
+      - name: Create batch zip artifact
+        if: ${{ env.RUN_MODE == 'batch' && success() }}
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile, ZIP_DEFLATED
+
+          output_dir = Path("output")
+          files = sorted(output_dir.rglob("*.mp4"))
+          if not files:
+            raise SystemExit("배치 ZIP 생성 실패: MP4 파일이 없습니다.")
+
+          zip_path = output_dir / "batch_videos.zip"
+          with ZipFile(zip_path, "w", compression=ZIP_DEFLATED) as zf:
+            for f in files:
+              zf.write(f, f.relative_to(output_dir))
+
+          print(f"ZIP 생성 완료: {zip_path} ({len(files)} files)")
+          PY
+
       - name: Check generated prompts
         if: ${{ (env.RUN_MODE == 'prompts' || env.RUN_MODE == 'both') && success() }}
         run: |
@@ -135,6 +155,15 @@ jobs:
           path: |
             output/*.mp4
             output/**/*.mp4
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload batch zip artifact
+        if: ${{ env.RUN_MODE == 'batch' && success() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: batch-rendered-videos-zip
+          path: output/batch_videos.zip
           if-no-files-found: error
           retention-days: 7
 
