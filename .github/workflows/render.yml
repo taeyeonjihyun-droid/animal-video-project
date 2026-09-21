@@ -1,11 +1,57 @@
-name: Render animal trip video
+name: Render animal video (수동 실행)
 
 on:
   workflow_dispatch:
+    inputs:
+      run_mode:
+        description: "실행 모드 선택"
+        required: false
+        default: "render"
+        type: choice
+        options:
+          - render
+          - prompts
+          - both
+          - batch
+          - batch-prompts
+          - batch-both
+      batch_file:
+        description: "배치 설정 JSON 경로 (run_mode=batch 또는 batch-prompts일 때 사용)"
+        required: false
+        default: "batch_config.json"
+        type: string
+      batch_retry_count:
+        description: "배치 작업 실패 시 job별 재시도 횟수"
+        required: false
+        default: "0"
+        type: choice
+        options:
+          - "0"
+          - "1"
+          - "2"
+          - "3"
+      batch_summary_report:
+        description: "배치 요약 리포트(JSON) 생성 여부"
+        required: false
+        default: "true"
+        type: choice
+        options:
+          - "true"
+          - "false"
+
+permissions:
+  contents: read
+
+env:
+  RUN_MODE: ${{ contains(fromJSON('["render","prompts","both","batch","batch-prompts","batch-both"]'), github.event.inputs.run_mode) && github.event.inputs.run_mode || 'render' }}
+
+concurrency:
+  group: render-${{ github.workflow }}-${{ github.ref }}-${{ contains(fromJSON('["render","prompts","both","batch","batch-prompts","batch-both"]'), github.event.inputs.run_mode) && github.event.inputs.run_mode || 'render' }}
+  cancel-in-progress: true
 
 jobs:
   render:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
 
     steps:
@@ -27,13 +73,454 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Clean previous outputs
+        run: |
+          mkdir -p output
+          find output -mindepth 1 ! -name ".gitkeep" -delete
+
+      - name: Generate scene prompts
+        if: ${{ env.RUN_MODE == 'prompts' || env.RUN_MODE == 'both' }}
+        run: python main.py --generate-image-prompts --prompts-output output/scene_image_prompts.json
+
       - name: Render video
+        if: ${{ env.RUN_MODE == 'render' || env.RUN_MODE == 'both' }}
         run: python main.py
 
-      - name: Upload rendered video
+      - name: Render batch videos
+        id: batch_render
+        if: ${{ env.RUN_MODE == 'batch' || env.RUN_MODE == 'batch-both' }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          SUMMARY_ARG=""
+          if [ "${{ github.event.inputs.batch_summary_report || 'true' }}" = "true" ]; then
+            SUMMARY_ARG="--summary-report output/batch_render_summary.json"
+          fi
+          python main.py --batch-render --batch-file "${{ github.event.inputs.batch_file }}" --retry-failed "${{ github.event.inputs.batch_retry_count || '0' }}" ${SUMMARY_ARG} 2>&1 | tee output/batch_render.log
+
+      - name: Generate batch prompts
+        id: batch_prompts
+        if: ${{ env.RUN_MODE == 'batch-prompts' || env.RUN_MODE == 'batch-both' }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          SUMMARY_ARG=""
+          if [ "${{ github.event.inputs.batch_summary_report || 'true' }}" = "true" ]; then
+            SUMMARY_ARG="--summary-report output/batch_prompts_summary.json"
+          fi
+          python main.py --batch-generate-image-prompts --batch-file "${{ github.event.inputs.batch_file }}" --retry-failed "${{ github.event.inputs.batch_retry_count || '0' }}" ${SUMMARY_ARG} 2>&1 | tee output/batch_prompts.log
+
+      - name: Summarize batch failure reason
+        if: ${{ (env.RUN_MODE == 'batch' || env.RUN_MODE == 'batch-both') && steps.batch_render.outcome == 'failure' }}
+        shell: bash
+        run: |
+          echo "배치 렌더링 실패 원인 요약"
+          echo "## 배치 렌더링 실패 원인 요약" >> "$GITHUB_STEP_SUMMARY"
+          if [ -f output/batch_render.log ]; then
+            summary_lines="$(grep -E 'Traceback \(most recent call last\):|[A-Za-z_][A-Za-z0-9_.]*(Error|Exception):|오류|실패' output/batch_render.log | tail -n 20 || true)"
+            if [ -z "$summary_lines" ]; then
+              summary_lines="$(tail -n 40 output/batch_render.log || true)"
+            fi
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "\`\`\`text" >> "$GITHUB_STEP_SUMMARY"
+            echo "$summary_lines" >> "$GITHUB_STEP_SUMMARY"
+            echo "\`\`\`" >> "$GITHUB_STEP_SUMMARY"
+            echo "$summary_lines"
+          else
+            echo "batch_render.log 파일이 없어 상세 로그를 찾지 못했습니다." | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload batch failure log
+        if: ${{ (env.RUN_MODE == 'batch' || env.RUN_MODE == 'batch-both') && steps.batch_render.outcome == 'failure' }}
         uses: actions/upload-artifact@v4
         with:
-          name: animal-trip-video
-          path: output/animal_trip.mp4
+          name: batch-failure-log
+          path: output/batch_render.log
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Fail workflow for batch render error
+        if: ${{ env.RUN_MODE == 'batch' && steps.batch_render.outcome == 'failure' }}
+        run: |
+          echo "배치 렌더링 실패로 워크플로우를 종료합니다."
+          exit 1
+
+      - name: Check rendered videos
+        if: ${{ ((env.RUN_MODE == 'render' || env.RUN_MODE == 'both') && success()) || ((env.RUN_MODE == 'batch' || env.RUN_MODE == 'batch-both') && steps.batch_render.outcome == 'success') }}
+        shell: bash
+        run: |
+          if [ "${RUN_MODE}" = "batch" ] || [ "${RUN_MODE}" = "batch-both" ]; then
+            if [ ! -f output/batch_render.log ]; then
+              echo "배치 로그 파일이 없습니다: output/batch_render.log"
+              exit 1
+            fi
+            python - <<'PY'
+            from pathlib import Path
+
+            repo_root = Path(".").resolve()
+            log_path = Path("output/batch_render.log")
+            out_list = Path("output/rendered_files.txt")
+            seen = set()
+            files = []
+
+            for line in log_path.read_text(encoding="utf-8").splitlines():
+              prefix = "[배치 출력] "
+              if not line.startswith(prefix):
+                continue
+              raw = line[len(prefix):].strip()
+              if not raw:
+                continue
+              p = Path(raw)
+              if not p.is_absolute():
+                raise SystemExit(f"배치 출력 경로는 절대경로여야 합니다: {raw}")
+              p = p.resolve()
+              try:
+                p.relative_to(repo_root)
+              except ValueError:
+                raise SystemExit(f"배치 출력 경로가 저장소 범위를 벗어났습니다: {p}")
+              if not p.exists() or p.suffix.lower() != ".mp4":
+                raise SystemExit(f"배치 출력 MP4 파일이 없거나 형식이 올바르지 않습니다: {p}")
+              key = str(p)
+              if key not in seen:
+                seen.add(key)
+                files.append(key)
+
+            if not files:
+              raise SystemExit("배치 출력 로그에서 유효한 MP4 경로를 찾지 못했습니다.")
+            out_list.write_text("\n".join(files) + "\n", encoding="utf-8")
+            PY
+            mapfile -t files < output/rendered_files.txt
+          else
+            python - <<'PY'
+            import json
+            from pathlib import Path
+            
+            repo_root = Path(".").resolve()
+            cfg = json.loads(Path("config.json").read_text(encoding="utf-8"))
+            output_value = cfg.get("output", "output/animal_trip.mp4")
+            if not isinstance(output_value, str) or not output_value.strip():
+              raise SystemExit("config.json의 output은 비어 있지 않은 문자열 경로여야 합니다.")
+            
+            output_path = Path(output_value)
+            if not output_path.is_absolute():
+              output_path = (repo_root / output_path).resolve()
+            else:
+              output_path = output_path.resolve()
+            try:
+              output_path.relative_to(repo_root)
+            except ValueError:
+              raise SystemExit(f"렌더링 출력 경로가 저장소 범위를 벗어났습니다: {output_path}")
+            if output_path.suffix.lower() != ".mp4":
+              raise SystemExit(f"렌더링 출력 파일은 MP4여야 합니다: {output_path}")
+            if not output_path.exists():
+              raise SystemExit(f"렌더링 결과 파일을 찾지 못했습니다: {output_path}")
+            
+            Path("output/rendered_files.txt").write_text(f"{output_path}\n", encoding="utf-8")
+            PY
+            mapfile -t files < output/rendered_files.txt
+          fi
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "렌더링된 MP4 파일 목록이 비어 있습니다."
+            exit 1
+          fi
+          for file in "${files[@]}"; do
+            if [ ! -f "$file" ]; then
+              echo "렌더링 결과 파일을 찾지 못했습니다: $file"
+              exit 1
+            fi
+          done
+          printf "렌더링 결과:\n%s\n" "${files[@]}"
+
+      - name: Create batch zip artifact
+        if: ${{ (env.RUN_MODE == 'batch' || env.RUN_MODE == 'batch-both') && steps.batch_render.outcome == 'success' }}
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile, ZIP_DEFLATED
+
+          repo_root = Path(".").resolve()
+          output_dir = Path("output")
+          list_path = output_dir / "rendered_files.txt"
+          if not list_path.exists():
+            raise SystemExit("배치 ZIP 생성 실패: rendered_files.txt가 없습니다.")
+
+          files = []
+          for line in list_path.read_text(encoding="utf-8").splitlines():
+            raw = line.strip()
+            if not raw:
+              continue
+            p = Path(raw)
+            if not p.is_absolute():
+              p = (repo_root / p).resolve()
+            else:
+              p = p.resolve()
+            try:
+              p.relative_to(repo_root)
+            except ValueError:
+              raise SystemExit(f"배치 ZIP 생성 실패: 저장소 범위를 벗어난 경로입니다: {p}")
+            if not p.exists():
+              raise SystemExit(f"배치 ZIP 생성 실패: 파일이 존재하지 않습니다: {p}")
+            if p.suffix.lower() != ".mp4":
+              raise SystemExit(f"배치 ZIP 생성 실패: MP4 파일이 아닙니다: {p}")
+            files.append(p)
+          if not files:
+            raise SystemExit("배치 ZIP 생성 실패: 유효한 MP4 목록이 없습니다.")
+
+          zip_path = output_dir / "batch_videos.zip"
+          with ZipFile(zip_path, "w", compression=ZIP_DEFLATED) as zf:
+            for f in files:
+              rel = f.relative_to(repo_root)
+              arcname = rel.relative_to("output") if rel.parts and rel.parts[0] == "output" else rel
+              zf.write(f, arcname)
+
+          print(f"ZIP 생성 완료: {zip_path} ({len(files)} files)")
+          PY
+
+      - name: Collect rendered files for artifact upload
+        if: ${{ ((env.RUN_MODE == 'render' || env.RUN_MODE == 'both') && success()) || ((env.RUN_MODE == 'batch' || env.RUN_MODE == 'batch-both') && steps.batch_render.outcome == 'success') }}
+        run: |
+          python - <<'PY'
+          import shutil
+          from pathlib import Path
+
+          repo_root = Path(".").resolve()
+          target_root = Path("output/render_artifacts")
+          shutil.rmtree(target_root, ignore_errors=True)
+          target_root.mkdir(parents=True, exist_ok=True)
+          list_path = Path("output/rendered_files.txt")
+          if not list_path.exists():
+            raise SystemExit("렌더 아티팩트 수집 실패: rendered_files.txt가 없습니다.")
+          used_destinations = set()
+          def with_suffix(path: Path, index: int) -> Path:
+            return path.with_name(f"{path.stem}_{index:02d}{path.suffix}")
+
+          for line in list_path.read_text(encoding="utf-8").splitlines():
+            raw = line.strip()
+            if not raw:
+              continue
+            source = Path(raw)
+            if not source.is_absolute():
+              source = (repo_root / source).resolve()
+            else:
+              source = source.resolve()
+            try:
+              rel = source.relative_to(repo_root)
+            except ValueError:
+              raise SystemExit(f"렌더 아티팩트 수집 실패: 저장소 범위를 벗어난 경로입니다: {source}")
+            if rel.parts[:2] == ("output", "render_artifacts"):
+              continue
+            if not source.exists():
+              raise SystemExit(f"렌더 아티팩트 수집 실패: 파일이 존재하지 않습니다: {source}")
+            if source.suffix.lower() != ".mp4":
+              raise SystemExit(f"렌더 아티팩트 수집 실패: MP4 파일이 아닙니다: {source}")
+            artifact_rel = rel.relative_to("output") if rel.parts and rel.parts[0] == "output" else rel
+            base_dest = target_root / artifact_rel
+            dest = base_dest
+            suffix_index = 2
+            while str(dest) in used_destinations or dest.exists():
+              dest = with_suffix(base_dest, suffix_index)
+              suffix_index += 1
+            used_destinations.add(str(dest))
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, dest)
+          PY
+
+      - name: Summarize batch prompts failure reason
+        if: ${{ (env.RUN_MODE == 'batch-prompts' || env.RUN_MODE == 'batch-both') && steps.batch_prompts.outcome == 'failure' }}
+        shell: bash
+        run: |
+          echo "배치 프롬프트 생성 실패 원인 요약"
+          echo "## 배치 프롬프트 생성 실패 원인 요약" >> "$GITHUB_STEP_SUMMARY"
+          if [ -f output/batch_prompts.log ]; then
+            summary_lines="$(grep -E 'Traceback \(most recent call last\):|[A-Za-z_][A-Za-z0-9_.]*(Error|Exception):|오류|실패' output/batch_prompts.log | tail -n 20 || true)"
+            if [ -z "$summary_lines" ]; then
+              summary_lines="$(tail -n 40 output/batch_prompts.log || true)"
+            fi
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "\`\`\`text" >> "$GITHUB_STEP_SUMMARY"
+            echo "$summary_lines" >> "$GITHUB_STEP_SUMMARY"
+            echo "\`\`\`" >> "$GITHUB_STEP_SUMMARY"
+            echo "$summary_lines"
+          else
+            echo "batch_prompts.log 파일이 없어 상세 로그를 찾지 못했습니다." | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload batch prompts failure log
+        if: ${{ (env.RUN_MODE == 'batch-prompts' || env.RUN_MODE == 'batch-both') && steps.batch_prompts.outcome == 'failure' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: batch-prompts-failure-log
+          path: output/batch_prompts.log
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Fail workflow for batch prompts error
+        if: ${{ env.RUN_MODE == 'batch-prompts' && steps.batch_prompts.outcome == 'failure' }}
+        run: |
+          echo "배치 프롬프트 생성 실패로 워크플로우를 종료합니다."
+          exit 1
+
+      - name: Check generated prompts
+        if: ${{ (env.RUN_MODE == 'prompts' || env.RUN_MODE == 'both') && success() }}
+        run: |
+          test -f output/scene_image_prompts.json
+          echo "프롬프트 결과 확인: output/scene_image_prompts.json"
+
+      - name: Check batch generated prompts
+        if: ${{ (env.RUN_MODE == 'batch-prompts' || env.RUN_MODE == 'batch-both') && steps.batch_prompts.outcome == 'success' }}
+        run: |
+          if [ ! -f output/batch_prompts.log ]; then
+            echo "배치 프롬프트 로그 파일이 없습니다: output/batch_prompts.log"
+            exit 1
+          fi
+          python - <<'PY'
+          from pathlib import Path
+
+          repo_root = Path(".").resolve()
+          log_path = Path("output/batch_prompts.log")
+          out_list = Path("output/prompt_files.txt")
+          seen = set()
+          files = []
+
+          for line in log_path.read_text(encoding="utf-8").splitlines():
+            prefix = "[배치 프롬프트 출력] "
+            if not line.startswith(prefix):
+              continue
+            raw = line[len(prefix):].strip()
+            if not raw:
+              continue
+            p = Path(raw)
+            if not p.is_absolute():
+              raise SystemExit(f"배치 프롬프트 출력 경로는 절대경로여야 합니다: {raw}")
+            p = p.resolve()
+            try:
+              p.relative_to(repo_root)
+            except ValueError:
+              raise SystemExit(f"배치 프롬프트 출력 경로가 저장소 범위를 벗어났습니다: {p}")
+            if not p.exists() or p.suffix.lower() != ".json":
+              raise SystemExit(f"배치 프롬프트 JSON 파일이 없거나 형식이 올바르지 않습니다: {p}")
+            key = str(p)
+            if key not in seen:
+              seen.add(key)
+              files.append(key)
+
+          if not files:
+            raise SystemExit("배치 프롬프트 로그에서 유효한 JSON 경로를 찾지 못했습니다.")
+          out_list.write_text("\n".join(files) + "\n", encoding="utf-8")
+          PY
+
+      - name: Collect batch prompt files for artifact upload
+        if: ${{ (env.RUN_MODE == 'batch-prompts' || env.RUN_MODE == 'batch-both') && steps.batch_prompts.outcome == 'success' }}
+        run: |
+          python - <<'PY'
+          import shutil
+          from pathlib import Path
+
+          repo_root = Path(".").resolve()
+          target_root = Path("output/prompt_artifacts")
+          shutil.rmtree(target_root, ignore_errors=True)
+          target_root.mkdir(parents=True, exist_ok=True)
+          list_path = Path("output/prompt_files.txt")
+          if not list_path.exists():
+            raise SystemExit("배치 프롬프트 아티팩트 수집 실패: prompt_files.txt가 없습니다.")
+          used_destinations = set()
+
+          def with_suffix(path: Path, index: int) -> Path:
+            return path.with_name(f"{path.stem}_{index:02d}{path.suffix}")
+
+          for line in list_path.read_text(encoding="utf-8").splitlines():
+            raw = line.strip()
+            if not raw:
+              continue
+            source = Path(raw)
+            if not source.is_absolute():
+              source = (repo_root / source).resolve()
+            else:
+              source = source.resolve()
+            try:
+              rel = source.relative_to(repo_root)
+            except ValueError:
+              raise SystemExit(f"배치 프롬프트 아티팩트 수집 실패: 저장소 범위를 벗어난 경로입니다: {source}")
+            if rel.parts[:2] == ("output", "prompt_artifacts"):
+              continue
+            if not source.exists():
+              raise SystemExit(f"배치 프롬프트 아티팩트 수집 실패: 파일이 존재하지 않습니다: {source}")
+            if source.suffix.lower() != ".json":
+              raise SystemExit(f"배치 프롬프트 아티팩트 수집 실패: JSON 파일이 아닙니다: {source}")
+            artifact_rel = rel.relative_to("output") if rel.parts and rel.parts[0] == "output" else rel
+            base_dest = target_root / artifact_rel
+            dest = base_dest
+            suffix_index = 2
+            while str(dest) in used_destinations or dest.exists():
+              dest = with_suffix(base_dest, suffix_index)
+              suffix_index += 1
+            used_destinations.add(str(dest))
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, dest)
+          PY
+
+      - name: Upload rendered video
+        if: ${{ ((env.RUN_MODE == 'render' || env.RUN_MODE == 'both') && success()) || ((env.RUN_MODE == 'batch' || env.RUN_MODE == 'batch-both') && steps.batch_render.outcome == 'success') }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: rendered-animal-video
+          path: output/render_artifacts/**/*
           if-no-files-found: error
           retention-days: 7
+
+      - name: Upload batch zip artifact
+        if: ${{ (env.RUN_MODE == 'batch' || env.RUN_MODE == 'batch-both') && steps.batch_render.outcome == 'success' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: batch-rendered-videos-zip
+          path: output/batch_videos.zip
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload generated prompts
+        if: ${{ (env.RUN_MODE == 'prompts' || env.RUN_MODE == 'both') && success() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: scene-image-prompts
+          path: output/scene_image_prompts.json
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload generated prompts (batch)
+        if: ${{ (env.RUN_MODE == 'batch-prompts' || env.RUN_MODE == 'batch-both') && steps.batch_prompts.outcome == 'success' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: batch-scene-image-prompts
+          path: output/prompt_artifacts/**/*
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload batch summary report
+        if: ${{ (env.RUN_MODE == 'batch' || env.RUN_MODE == 'batch-prompts' || env.RUN_MODE == 'batch-both') && (github.event.inputs.batch_summary_report || 'true') == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: batch-execution-summary
+          path: |
+            output/batch_render_summary.json
+            output/batch_prompts_summary.json
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Upload batch run logs
+        if: ${{ env.RUN_MODE == 'batch' || env.RUN_MODE == 'batch-prompts' || env.RUN_MODE == 'batch-both' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: batch-run-logs
+          path: |
+            output/batch_render.log
+            output/batch_prompts.log
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Fail workflow for batch-both error
+        if: ${{ env.RUN_MODE == 'batch-both' && (steps.batch_render.outcome == 'failure' || steps.batch_prompts.outcome == 'failure') }}
+        run: |
+          echo "batch-both 실행 중 실패가 발생해 워크플로우를 종료합니다."
+          exit 1

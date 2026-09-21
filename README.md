@@ -47,13 +47,31 @@ animal_trip_video_project/
 
 휴대폰에서도 가능합니다.
 
-1. 이 프로젝트 전체를 GitHub 저장소에 업로드합니다.
-2. `assets/images/` 안에 자신의 장면 이미지 8장을 넣습니다.
-3. 필요하면 `assets/audio/bgm.mp3`를 넣습니다.
-4. GitHub 저장소의 **Actions** 메뉴를 엽니다.
-5. **Render animal trip video**를 선택합니다.
-6. **Run workflow**를 누릅니다.
-7. 작업 완료 후 `animal-trip-video` 아티팩트를 받습니다.
+1. `config.json`, `assets/` 등 렌더링에 필요한 파일을 수정한 뒤 **반드시 커밋/푸시**합니다.
+2. GitHub 저장소 상단에서 **Actions** 탭을 엽니다.
+3. 왼쪽 워크플로 목록에서 **Render animal video (수동 실행)** 을 클릭합니다.
+4. 오른쪽에서 **Run workflow** 버튼을 누른 뒤 `run_mode`를 선택합니다.
+   - `render`: 영상 렌더링(MP4)
+   - `prompts`: 장면 프롬프트 JSON 생성
+   - `both`: 프롬프트 생성 + 영상 렌더링
+   - `batch`: 배치 설정 파일 기준 여러 영상 순차 렌더링
+   - `batch-prompts`: 배치 설정 파일 기준 각 job의 프롬프트 JSON만 순차 생성
+   - `batch-both`: 배치 설정 파일 기준 프롬프트 JSON 생성 + 영상 순차 렌더링
+5. 실행할 브랜치를 확인하고 **Run workflow**를 누릅니다.
+6. 실행이 끝나면 run 상세 화면의 **Artifacts**에서 결과를 다운로드합니다.
+   - 영상: `rendered-animal-video`
+   - 프롬프트: `scene-image-prompts`
+   - 배치 프롬프트: `batch-scene-image-prompts` (batch-prompts/batch-both 모드 성공 시)
+   - 배치 ZIP: `batch-rendered-videos-zip` (batch/batch-both 모드 성공 시)
+   - 배치 요약: `batch-execution-summary` (batch/batch-prompts/batch-both에서 `batch_summary_report=true`일 때)
+   - 배치 로그: `batch-run-logs` (batch/batch-prompts/batch-both 실행 시)
+   - 배치 모드 사용 시 `batch_file` 입력(기본 `batch_config.json`)으로 파일 경로를 지정할 수 있습니다.
+   - 배치 모드(`batch`, `batch-prompts`, `batch-both`)에서는 `batch_retry_count`로 job별 실패 재시도 횟수(0~3)를 지정할 수 있습니다.
+   - 배치 모드(`batch`, `batch-prompts`, `batch-both`)에서는 `batch_summary_report`로 실행 시간/성공 개수 요약 JSON 생성 여부를 선택할 수 있습니다.
+
+참고:
+- 실행 시간은 장면 수/길이에 따라 보통 몇 분 정도 걸릴 수 있습니다.
+- 워크플로는 저장소에 커밋된 `config.json`과 에셋 파일 기준으로 렌더링합니다.
 
 ## 2. PC에서 실행
 
@@ -109,6 +127,211 @@ Veo, Gemini, Runway, Firefly 등에서 만든 짧은 클립을 넣으면
 ```
 
 8개 장면의 `duration` 합이 60이면 1분 영상이 됩니다.
+
+## 6. 장면용 AI 이미지 프롬프트 자동 생성
+
+`config.json`의 `scenes`를 읽어서 장면별 이미지 생성 프롬프트를 자동으로 만듭니다.
+
+```bash
+python main.py --generate-image-prompts
+```
+
+생성 결과:
+
+```text
+output/scene_image_prompts.json
+```
+
+옵션으로 출력 경로를 직접 지정할 수 있습니다.
+
+```bash
+python main.py --generate-image-prompts --prompts-output output/my_prompts.json
+```
+
+`--prompts-output` 경로는 프로젝트 폴더 내부 경로만 사용할 수 있습니다(상대 경로는 실행 위치 기준, 절대 경로도 가능).
+
+GitHub Actions에서도 동일하게 생성할 수 있습니다.
+
+1. **Actions** → **Render animal video (수동 실행)** → **Run workflow**
+2. `run_mode`를 `prompts`(또는 `both`)로 선택
+3. 완료 후 **Artifacts**에서 `scene-image-prompts` 다운로드
+
+## 7. 쇼츠 배치 생성 (여러 편 자동 제작)
+
+여러 개의 설정 파일을 한 번에 순차 렌더링할 수 있습니다.
+
+1) 프로젝트 루트에 배치 설정 파일(예: `batch_config.json`)을 만듭니다.
+
+```json
+{
+  "prompt_filename_pattern": "{index2}_{job_slug}_prompts.json",
+  "jobs": [
+    {
+      "name": "beach-episode-1",
+      "config": "config.json"
+    },
+    {
+      "name": "beach-episode-2",
+      "config": "configs/episode2.json",
+      "overrides": {
+        "output": "output/episode2.mp4"
+      }
+    }
+  ]
+}
+```
+
+`prompt_filename_pattern`(선택)을 사용하면 `batch-prompts` 모드에서 job별 프롬프트 파일명을 자동 규칙으로 만들 수 있습니다.  
+사용 가능한 변수: `{index}`, `{index2}`, `{job}`, `{job_slug}`, `{config}`, `{stem}`
+
+2) 배치 렌더링 실행:
+
+```bash
+python main.py --batch-render --batch-file batch_config.json
+```
+
+실패 재시도를 적용하려면:
+
+```bash
+python main.py --batch-render --batch-file batch_config.json --retry-failed 2
+```
+
+실행 요약 리포트를 저장하려면:
+
+```bash
+python main.py --batch-render --batch-file batch_config.json --summary-report output/batch_render_summary.json
+```
+
+GitHub Actions에서 배치 실행:
+
+1. **Actions** → **Render animal video (수동 실행)** → **Run workflow**
+2. `run_mode`를 `batch`로 선택
+3. 필요하면 `batch_file` 입력값을 수정(예: `configs/batch_week1.json`)
+4. 필요하면 `batch_retry_count`를 설정(예: `2`)
+5. 필요하면 `batch_summary_report`를 설정(기본 `true`)
+6. 완료 후 **Artifacts**에서 결과 다운로드
+   - `rendered-animal-video`: `render`/`both` 모드에서는 단일 MP4, `batch`/`batch-both` 모드에서는 `output/` 접두사를 제거한 정규화 상대경로 구조의 여러 MP4 파일
+   - `batch-rendered-videos-zip`: 배치 결과 MP4 ZIP 묶음
+7. 실패 시 run 요약 화면에 **배치 실패 원인 요약 로그**가 자동으로 출력되며, `batch-failure-log` 아티팩트로 원본 로그를 받을 수 있습니다.
+
+GitHub Actions에서 배치 프롬프트만 생성:
+
+1. **Actions** → **Render animal video (수동 실행)** → **Run workflow**
+2. `run_mode`를 `batch-prompts`로 선택
+3. 필요하면 `batch_file` 입력값을 수정(예: `configs/batch_week1.json`)
+4. 필요하면 `batch_retry_count`를 설정(예: `2`)
+5. 필요하면 `batch_summary_report`를 설정(기본 `true`)
+6. 완료 후 **Artifacts**에서 `batch-scene-image-prompts` 다운로드
+
+GitHub Actions에서 배치 프롬프트+렌더링 함께 실행:
+
+1. **Actions** → **Render animal video (수동 실행)** → **Run workflow**
+2. `run_mode`를 `batch-both`로 선택
+3. 필요하면 `batch_file` 입력값을 수정(예: `configs/batch_week1.json`)
+4. 필요하면 `batch_retry_count`를 설정(예: `2`)
+5. 필요하면 `batch_summary_report`를 설정(기본 `true`)
+6. 완료 후 **Artifacts**에서 아래 결과를 함께 다운로드
+   - `rendered-animal-video`
+   - `batch-rendered-videos-zip`
+   - `batch-scene-image-prompts`
+   - `batch-execution-summary` (`batch_summary_report=true`일 때)
+   - `batch-run-logs`
+
+옵션:
+- `--batch-file`을 생략하면 기본값으로 `batch_config.json`을 사용합니다.
+- `--batch-file` 경로는 명령 실행 위치(현재 디렉터리) 기준 상대 경로이며, 프로젝트 폴더 내부 파일만 허용됩니다.
+- `--retry-failed`는 배치 작업 실패 시 job별 재시도 횟수를 지정합니다(0 이상의 정수).
+- `--summary-report`를 지정하면 배치 실행 시간/성공 개수/실패 개수 요약 JSON을 저장합니다.
+  - 고정 스키마 버전 필드: `schema_version` (현재 `1.2`)
+  - 재시도 성공 결과 필드: `retry_successes` (`job`, `succeeded_on_attempt`)
+  - job 단위 실행 결과 필드: `job_results` (`job`, `status`, `attempts_used`, `max_attempts`, `retried`, `succeeded_on_attempt`, `output_path`, `error`)
+  - 중도 중단 여부 필드: `stopped_on_failure`
+- `prompt_filename_pattern`을 지정하면 `batch-prompts` 모드에서 파일명 규칙을 커스터마이즈할 수 있습니다(파일명만 허용, `.json` 자동 보정).
+- `overrides`는 각 작업의 설정을 덮어쓸 때 사용합니다(예: `output`, `project_title`, `subtitle`).
+- `jobs[].config` 경로는 **배치 파일 위치 기준 상대 경로**로 해석됩니다.
+- 여러 작업에서 최종 출력 경로가 중복되거나, 이미 같은 경로의 파일이 존재하면(기본값/`overrides.output` 포함) 파일명에 `_02`처럼 번호를 붙여 덮어쓰기를 방지합니다.
+
+### `batch-execution-summary` JSON 예시
+
+성공 케이스(1개 job 성공):
+
+```json
+{
+  "schema_version": "1.2",
+  "mode": "batch-render",
+  "batch_file": "/home/runner/work/animal-video-project/animal-video-project/batch_config.json",
+  "total_jobs": 1,
+  "success_count": 1,
+  "failure_count": 0,
+  "failed_jobs": [],
+  "retry_successes": [],
+  "job_results": [
+    {
+      "job": "batch-01",
+      "status": "success",
+      "attempts_used": 1,
+      "max_attempts": 1,
+      "retried": false,
+      "succeeded_on_attempt": 1,
+      "output_path": "/home/runner/work/animal-video-project/animal-video-project/output/test.mp4",
+      "error": null
+    }
+  ],
+  "stopped_on_failure": false,
+  "duration_seconds": 0.123,
+  "generated_at": "2026-09-21T13:00:00+00:00"
+}
+```
+
+실패 케이스(1개 job 실패):
+
+```json
+{
+  "schema_version": "1.2",
+  "mode": "batch-render",
+  "batch_file": "/home/runner/work/animal-video-project/animal-video-project/batch_config.json",
+  "total_jobs": 1,
+  "success_count": 0,
+  "failure_count": 1,
+  "failed_jobs": ["fail-job"],
+  "retry_successes": [],
+  "job_results": [
+    {
+      "job": "fail-job",
+      "status": "failure",
+      "attempts_used": 2,
+      "max_attempts": 2,
+      "retried": true,
+      "succeeded_on_attempt": null,
+      "output_path": "/home/runner/work/animal-video-project/animal-video-project/output/test.mp4",
+      "error": "always fail"
+    }
+  ],
+  "stopped_on_failure": true,
+  "duration_seconds": 0.456,
+  "generated_at": "2026-09-21T13:00:10+00:00"
+}
+```
+
+### 스키마 마이그레이션 노트 (1.1 → 1.2)
+
+- `schema_version` 값이 `1.2`로 변경되었습니다.
+- 신규 필드가 추가되었습니다.
+  - `job_results`: job 단위 최종 실행 결과 상세
+  - `stopped_on_failure`: 실패로 배치가 중단되었는지 여부
+- 기존 `retry_successes` 필드는 유지되며, 재시도 후 성공한 job만 별도 요약합니다.
+
+### batch-both 수동 실행 테스트 시 아티팩트 샘플 캡처 형식
+
+아래와 같이 **Run 상세 > Artifacts**에서 확인할 수 있습니다.
+
+```text
+rendered-animal-video
+batch-rendered-videos-zip
+batch-scene-image-prompts
+batch-execution-summary
+batch-run-logs
+```
 
 ## 저작권 주의
 
