@@ -259,6 +259,32 @@ class BatchFeatureTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             main.build_batch_videos(rel_batch_path)
 
+    def test_existing_output_file_gets_suffix_to_avoid_overwrite(self):
+        batch_dir = self.tmp_dir / "existing-output"
+        cfg_path = batch_dir / "episode.json"
+        batch_path = batch_dir / "batch.json"
+        existing_output = batch_dir / "output" / "test.mp4"
+        existing_output.parent.mkdir(parents=True, exist_ok=True)
+        existing_output.write_text("existing", encoding="utf-8")
+        self._write_json(
+            cfg_path,
+            {
+                "project_title": "테스트",
+                "subtitle": "테스트",
+                "video": {"width": 320, "height": 180, "fps": 12, "fade_seconds": 0.1},
+                "output": "output/test.mp4",
+                "scenes": [{"source": "assets/images/x.png", "caption": "x", "duration": 0.3, "zoom": 1.0}],
+            },
+        )
+        self._write_json(batch_path, {"jobs": [{"config": "episode.json"}]})
+
+        rel_batch_path = batch_path.relative_to(main.ROOT).as_posix()
+        with patch("main.build_video_from_config") as mocked_build:
+            main.build_batch_videos(rel_batch_path)
+
+        rendered_cfg = mocked_build.call_args.args[0]
+        self.assertEqual(Path(rendered_cfg["output"]), Path("output/test_02.mp4"))
+
     def test_nested_config_relative_output_is_resolved_from_config_dir(self):
         batch_dir = self.tmp_dir / "nested-output"
         cfg_path = batch_dir / "episode.json"

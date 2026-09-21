@@ -578,7 +578,7 @@ def build_batch_videos(batch_file_override: str | None = None) -> None:
         base_output = validate_output_value(cfg, base_dir=config_path.parent)
         final_output_value = base_output
         suffix_index = 2
-        while final_output_value in reserved_outputs:
+        while final_output_value in reserved_outputs or final_output_value.exists():
             final_output_value = with_batch_index_suffix(base_output, suffix_index)
             suffix_index += 1
         reserved_outputs.add(final_output_value)
