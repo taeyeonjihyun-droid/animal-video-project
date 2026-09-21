@@ -157,7 +157,15 @@ jobs:
             PY
             mapfile -t files < output/rendered_files.txt
           else
-            mapfile -t files < <(find output -type f -name '*.mp4')
+            mapfile -t files < <(python - <<'PY'
+            import json
+            from pathlib import Path
+
+            cfg = json.loads(Path("config.json").read_text(encoding="utf-8"))
+            output_path = cfg.get("output", "output/animal_trip.mp4")
+            print(output_path)
+            PY
+            )
             printf "%s\n" "${files[@]}" > output/rendered_files.txt
           fi
           if [ ${#files[@]} -eq 0 ]; then
@@ -195,8 +203,6 @@ jobs:
               p = (repo_root / p).resolve()
             else:
               p = p.resolve()
-            if not p.exists() or p.suffix.lower() != ".mp4":
-              continue
             try:
               p.relative_to(repo_root)
             except ValueError:
