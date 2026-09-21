@@ -62,8 +62,10 @@ animal_trip_video_project/
    - 프롬프트: `scene-image-prompts`
    - 배치 프롬프트: `batch-scene-image-prompts` (batch-prompts 모드 성공 시)
    - 배치 ZIP: `batch-rendered-videos-zip` (batch 모드 성공 시)
+   - 배치 요약: `batch-execution-summary` (batch/batch-prompts에서 `batch_summary_report=true`일 때)
    - 배치 모드 사용 시 `batch_file` 입력(기본 `batch_config.json`)으로 파일 경로를 지정할 수 있습니다.
    - 배치 모드(`batch`, `batch-prompts`)에서는 `batch_retry_count`로 job별 실패 재시도 횟수(0~3)를 지정할 수 있습니다.
+   - 배치 모드(`batch`, `batch-prompts`)에서는 `batch_summary_report`로 실행 시간/성공 개수 요약 JSON 생성 여부를 선택할 수 있습니다.
 
 참고:
 - 실행 시간은 장면 수/길이에 따라 보통 몇 분 정도 걸릴 수 있습니다.
@@ -192,16 +194,23 @@ python main.py --batch-render --batch-file batch_config.json
 python main.py --batch-render --batch-file batch_config.json --retry-failed 2
 ```
 
+실행 요약 리포트를 저장하려면:
+
+```bash
+python main.py --batch-render --batch-file batch_config.json --summary-report output/batch_render_summary.json
+```
+
 GitHub Actions에서 배치 실행:
 
 1. **Actions** → **Render animal video (수동 실행)** → **Run workflow**
 2. `run_mode`를 `batch`로 선택
 3. 필요하면 `batch_file` 입력값을 수정(예: `configs/batch_week1.json`)
 4. 필요하면 `batch_retry_count`를 설정(예: `2`)
-5. 완료 후 **Artifacts**에서 결과 다운로드
+5. 필요하면 `batch_summary_report`를 설정(기본 `true`)
+6. 완료 후 **Artifacts**에서 결과 다운로드
    - `rendered-animal-video`: `render`/`both` 모드에서는 단일 MP4, `batch` 모드에서는 `output/` 접두사를 제거한 정규화 상대경로 구조의 여러 MP4 파일
    - `batch-rendered-videos-zip`: 배치 결과 MP4 ZIP 묶음
-6. 실패 시 run 요약 화면에 **배치 실패 원인 요약 로그**가 자동으로 출력되며, `batch-failure-log` 아티팩트로 원본 로그를 받을 수 있습니다.
+7. 실패 시 run 요약 화면에 **배치 실패 원인 요약 로그**가 자동으로 출력되며, `batch-failure-log` 아티팩트로 원본 로그를 받을 수 있습니다.
 
 GitHub Actions에서 배치 프롬프트만 생성:
 
@@ -209,12 +218,14 @@ GitHub Actions에서 배치 프롬프트만 생성:
 2. `run_mode`를 `batch-prompts`로 선택
 3. 필요하면 `batch_file` 입력값을 수정(예: `configs/batch_week1.json`)
 4. 필요하면 `batch_retry_count`를 설정(예: `2`)
-5. 완료 후 **Artifacts**에서 `batch-scene-image-prompts` 다운로드
+5. 필요하면 `batch_summary_report`를 설정(기본 `true`)
+6. 완료 후 **Artifacts**에서 `batch-scene-image-prompts` 다운로드
 
 옵션:
 - `--batch-file`을 생략하면 기본값으로 `batch_config.json`을 사용합니다.
 - `--batch-file` 경로는 명령 실행 위치(현재 디렉터리) 기준 상대 경로이며, 프로젝트 폴더 내부 파일만 허용됩니다.
 - `--retry-failed`는 배치 작업 실패 시 job별 재시도 횟수를 지정합니다(0 이상의 정수).
+- `--summary-report`를 지정하면 배치 실행 시간/성공 개수/실패 개수 요약 JSON을 저장합니다.
 - `prompt_filename_pattern`을 지정하면 `batch-prompts` 모드에서 파일명 규칙을 커스터마이즈할 수 있습니다(파일명만 허용, `.json` 자동 보정).
 - `overrides`는 각 작업의 설정을 덮어쓸 때 사용합니다(예: `output`, `project_title`, `subtitle`).
 - `jobs[].config` 경로는 **배치 파일 위치 기준 상대 경로**로 해석됩니다.

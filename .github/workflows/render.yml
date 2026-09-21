@@ -29,6 +29,14 @@ on:
           - "1"
           - "2"
           - "3"
+      batch_summary_report:
+        description: "배치 요약 리포트(JSON) 생성 여부"
+        required: false
+        default: "true"
+        type: choice
+        options:
+          - "true"
+          - "false"
 
 permissions:
   contents: read
@@ -84,7 +92,11 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          python main.py --batch-render --batch-file "${{ github.event.inputs.batch_file }}" --retry-failed "${{ github.event.inputs.batch_retry_count || '0' }}" 2>&1 | tee output/batch_render.log
+          SUMMARY_ARG=""
+          if [ "${{ github.event.inputs.batch_summary_report || 'true' }}" = "true" ]; then
+            SUMMARY_ARG="--summary-report output/batch_render_summary.json"
+          fi
+          python main.py --batch-render --batch-file "${{ github.event.inputs.batch_file }}" --retry-failed "${{ github.event.inputs.batch_retry_count || '0' }}" ${SUMMARY_ARG} 2>&1 | tee output/batch_render.log
 
       - name: Generate batch prompts
         id: batch_prompts
@@ -93,7 +105,11 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          python main.py --batch-generate-image-prompts --batch-file "${{ github.event.inputs.batch_file }}" --retry-failed "${{ github.event.inputs.batch_retry_count || '0' }}" 2>&1 | tee output/batch_prompts.log
+          SUMMARY_ARG=""
+          if [ "${{ github.event.inputs.batch_summary_report || 'true' }}" = "true" ]; then
+            SUMMARY_ARG="--summary-report output/batch_prompts_summary.json"
+          fi
+          python main.py --batch-generate-image-prompts --batch-file "${{ github.event.inputs.batch_file }}" --retry-failed "${{ github.event.inputs.batch_retry_count || '0' }}" ${SUMMARY_ARG} 2>&1 | tee output/batch_prompts.log
 
       - name: Summarize batch failure reason
         if: ${{ env.RUN_MODE == 'batch' && steps.batch_render.outcome == 'failure' }}
@@ -478,4 +494,15 @@ jobs:
           name: batch-scene-image-prompts
           path: output/prompt_artifacts/**/*
           if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload batch summary report
+        if: ${{ (env.RUN_MODE == 'batch' || env.RUN_MODE == 'batch-prompts') && (github.event.inputs.batch_summary_report || 'true') == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: batch-execution-summary
+          path: |
+            output/batch_render_summary.json
+            output/batch_prompts_summary.json
+          if-no-files-found: ignore
           retention-days: 7

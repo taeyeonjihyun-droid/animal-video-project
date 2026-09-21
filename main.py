@@ -5,6 +5,8 @@ import copy
 import json
 import math
 import re
+import time
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Tuple
 
@@ -155,6 +157,49 @@ def build_prompt_filename_from_pattern(
     return rendered if rendered.lower().endswith(".json") else f"{rendered}.json"
 
 
+def resolve_summary_report_path(path_value: str, *, base_dir: Path) -> Path:
+    report_path = resolve_repo_relative_path(
+        path_value,
+        base_dir=base_dir,
+        must_exist=False,
+        allow_parent_create=True,
+    )
+    if report_path.suffix.lower() != ".json":
+        raise ValueError("summary_report 경로는 .json 파일이어야 합니다.")
+    return report_path
+
+
+def write_batch_summary_report(
+    *,
+    report_path: Path | None,
+    mode: str,
+    batch_path: Path,
+    total_jobs: int,
+    success_count: int,
+    failure_count: int,
+    failed_jobs: list[str],
+    duration_seconds: float,
+) -> None:
+    print(
+        f"[배치 요약] mode={mode}, total={total_jobs}, success={success_count}, "
+        f"failure={failure_count}, duration={duration_seconds:.2f}s"
+    )
+    if report_path is None:
+        return
+    payload = {
+        "mode": mode,
+        "batch_file": str(batch_path),
+        "total_jobs": total_jobs,
+        "success_count": success_count,
+        "failure_count": failure_count,
+        "failed_jobs": failed_jobs,
+        "duration_seconds": round(duration_seconds, 3),
+        "generated_at": datetime.now(UTC).isoformat(),
+    }
+    report_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(f"[배치 요약 저장] {report_path}")
+
+
 def parse_args() -> argparse.Namespace:
     """Parse CLI flags and return an argparse.Namespace for execution mode selection."""
     parser = argparse.ArgumentParser(description="Animal video renderer / scene prompt generator")
@@ -191,6 +236,12 @@ def parse_args() -> argparse.Namespace:
         default=0,
         help="배치 작업 실패 시 job별 재시도 횟수 (기본: 0)",
     )
+    parser.add_argument(
+        "--summary-report",
+        type=str,
+        default=None,
+        help="배치 실행 요약(JSON) 저장 경로 (batch/batch-prompts 모드에서만 사용)",
+    )
     args = parser.parse_args()
     if args.prompts_output and not args.generate_image_prompts:
         parser.error("--prompts-output는 --generate-image-prompts와 함께 사용해야 합니다.")
@@ -206,6 +257,8 @@ def parse_args() -> argparse.Namespace:
         parser.error("--retry-failed는 0 이상의 정수여야 합니다.")
     if args.retry_failed > 0 and not (args.batch_render or args.batch_generate_image_prompts):
         parser.error("--retry-failed는 --batch-render 또는 --batch-generate-image-prompts와 함께 사용해야 합니다.")
+    if args.summary_report and not (args.batch_render or args.batch_generate_image_prompts):
+        parser.error("--summary-report는 --batch-render 또는 --batch-generate-image-prompts와 함께 사용해야 합니다.")
     return args
 
 
@@ -622,7 +675,12 @@ def build_video_from_config(
     print(f"[완료] {out}")
 
 
-def build_batch_videos(batch_file_override: str | None = None, *, retry_failed: int = 0) -> None:
+def build_batch_videos(
+    batch_file_override: str | None = None,
+    *,
+    retry_failed: int = 0,
+    summary_report_path: str | None = None,
+) -> None:
     batch_file = batch_file_override or "batch_config.json"
     batch_path = resolve_repo_relative_path(
         batch_file,
@@ -635,6 +693,11 @@ def build_batch_videos(batch_file_override: str | None = None, *, retry_failed: 
     jobs = batch_cfg.get("jobs")
     if not isinstance(jobs, list) or not jobs:
         raise ValueError("배치 설정 파일에는 1개 이상의 jobs 목록이 필요합니다.")
+    report_path = (
+        resolve_summary_report_path(summary_report_path, base_dir=Path.cwd().resolve())
+        if summary_report_path
+        else None
+    )
 
     print(f"[배치 시작] {batch_path} / 총 {len(jobs)}개")
     reserved_outputs: set[Path] = set()
@@ -668,6 +731,11 @@ def build_batch_videos(batch_file_override: str | None = None, *, retry_failed: 
         name = str(job.get("name", f"batch-{index:02d}"))
         planned_jobs.append((name, config_path, cfg, config_path.parent, final_output_value))
 
+    success_count = 0
+    failure_count = 0
+    failed_jobs: list[str] = []
+    start_time = time.perf_counter()
+    last_error: Exception | None = None
     for index, (name, config_path, cfg, output_base_dir, final_output_value) in enumerate(planned_jobs, start=1):
         try:
             cfg["output"] = str(final_output_value.relative_to(output_base_dir))
@@ -683,13 +751,37 @@ def build_batch_videos(batch_file_override: str | None = None, *, retry_failed: 
                 break
             except Exception as exc:
                 if attempt >= max_attempts:
-                    raise
+                    last_error = exc
+                    failure_count += 1
+                    failed_jobs.append(name)
+                    break
                 print(f"[배치 재시도] {name}: {exc}")
+        if last_error is not None:
+            break
         print(f"[배치 출력] {final_output_value}")
+        success_count += 1
+    duration_seconds = time.perf_counter() - start_time
+    write_batch_summary_report(
+        report_path=report_path,
+        mode="batch-render",
+        batch_path=batch_path,
+        total_jobs=len(jobs),
+        success_count=success_count,
+        failure_count=failure_count,
+        failed_jobs=failed_jobs,
+        duration_seconds=duration_seconds,
+    )
+    if last_error is not None:
+        raise last_error
     print("[배치 완료] 모든 영상 렌더링이 끝났습니다.")
 
 
-def build_batch_image_prompts(batch_file_override: str | None = None, *, retry_failed: int = 0) -> None:
+def build_batch_image_prompts(
+    batch_file_override: str | None = None,
+    *,
+    retry_failed: int = 0,
+    summary_report_path: str | None = None,
+) -> None:
     batch_file = batch_file_override or "batch_config.json"
     batch_path = resolve_repo_relative_path(
         batch_file,
@@ -702,6 +794,11 @@ def build_batch_image_prompts(batch_file_override: str | None = None, *, retry_f
     jobs = batch_cfg.get("jobs")
     if not isinstance(jobs, list) or not jobs:
         raise ValueError("배치 설정 파일에는 1개 이상의 jobs 목록이 필요합니다.")
+    report_path = (
+        resolve_summary_report_path(summary_report_path, base_dir=Path.cwd().resolve())
+        if summary_report_path
+        else None
+    )
     filename_pattern = batch_cfg.get("prompt_filename_pattern")
     if filename_pattern is not None and (not isinstance(filename_pattern, str) or not filename_pattern.strip()):
         raise ValueError("prompt_filename_pattern은 비어 있지 않은 문자열이어야 합니다.")
@@ -749,6 +846,11 @@ def build_batch_image_prompts(batch_file_override: str | None = None, *, retry_f
         name = str(job.get("name", f"batch-{index:02d}"))
         planned_jobs.append((name, config_path, cfg, config_path.parent, final_output_value))
 
+    success_count = 0
+    failure_count = 0
+    failed_jobs: list[str] = []
+    start_time = time.perf_counter()
+    last_error: Exception | None = None
     for index, (name, config_path, cfg, output_base_dir, final_output_value) in enumerate(planned_jobs, start=1):
         try:
             cfg["image_prompt_output"] = str(final_output_value.relative_to(output_base_dir))
@@ -764,18 +866,45 @@ def build_batch_image_prompts(batch_file_override: str | None = None, *, retry_f
                 break
             except Exception as exc:
                 if attempt >= max_attempts:
-                    raise
+                    last_error = exc
+                    failure_count += 1
+                    failed_jobs.append(name)
+                    break
                 print(f"[배치 프롬프트 재시도] {name}: {exc}")
+        if last_error is not None:
+            break
         print(f"[배치 프롬프트 출력] {final_output_value}")
+        success_count += 1
+    duration_seconds = time.perf_counter() - start_time
+    write_batch_summary_report(
+        report_path=report_path,
+        mode="batch-prompts",
+        batch_path=batch_path,
+        total_jobs=len(jobs),
+        success_count=success_count,
+        failure_count=failure_count,
+        failed_jobs=failed_jobs,
+        duration_seconds=duration_seconds,
+    )
+    if last_error is not None:
+        raise last_error
     print("[배치 프롬프트 완료] 모든 프롬프트 생성이 끝났습니다.")
 
 
 if __name__ == "__main__":
     args = parse_args()
     if args.batch_render:
-        build_batch_videos(args.batch_file, retry_failed=args.retry_failed)
+        build_batch_videos(
+            args.batch_file,
+            retry_failed=args.retry_failed,
+            summary_report_path=args.summary_report,
+        )
     elif args.batch_generate_image_prompts:
-        build_batch_image_prompts(args.batch_file, retry_failed=args.retry_failed)
+        build_batch_image_prompts(
+            args.batch_file,
+            retry_failed=args.retry_failed,
+            summary_report_path=args.summary_report,
+        )
     elif args.generate_image_prompts:
         generate_image_prompts(args.prompts_output)
     else:

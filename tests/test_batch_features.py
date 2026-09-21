@@ -462,6 +462,64 @@ class BatchFeatureTests(unittest.TestCase):
 
         self.assertEqual(mocked_prompts.call_count, 2)
 
+    def test_batch_render_summary_report_is_created(self):
+        batch_dir = self.tmp_dir / "batch-summary-render"
+        cfg_path = batch_dir / "episode.json"
+        batch_path = batch_dir / "batch.json"
+        report_path = batch_dir / "output" / "render_summary.json"
+        self._write_json(
+            cfg_path,
+            {
+                "project_title": "테스트",
+                "subtitle": "테스트",
+                "video": {"width": 320, "height": 180, "fps": 12, "fade_seconds": 0.1},
+                "output": "output/test.mp4",
+                "scenes": [{"source": "assets/images/x.png", "caption": "x", "duration": 0.3, "zoom": 1.0}],
+            },
+        )
+        self._write_json(batch_path, {"jobs": [{"config": "episode.json"}]})
+
+        rel_batch_path = batch_path.relative_to(main.ROOT).as_posix()
+        rel_report_path = report_path.relative_to(main.ROOT).as_posix()
+        with patch("main.build_video_from_config"):
+            main.build_batch_videos(rel_batch_path, summary_report_path=rel_report_path)
+
+        report = json.loads(report_path.read_text(encoding="utf-8"))
+        self.assertEqual(report["mode"], "batch-render")
+        self.assertEqual(report["total_jobs"], 1)
+        self.assertEqual(report["success_count"], 1)
+        self.assertEqual(report["failure_count"], 0)
+        self.assertIn("duration_seconds", report)
+
+    def test_batch_prompts_summary_report_is_created(self):
+        batch_dir = self.tmp_dir / "batch-summary-prompts"
+        cfg_path = batch_dir / "episode.json"
+        batch_path = batch_dir / "batch.json"
+        report_path = batch_dir / "output" / "prompts_summary.json"
+        self._write_json(
+            cfg_path,
+            {
+                "project_title": "테스트",
+                "subtitle": "테스트",
+                "video": {"width": 320, "height": 180, "fps": 12, "fade_seconds": 0.1},
+                "image_prompt_output": "output/prompts.json",
+                "scenes": [{"source": "assets/images/x.png", "caption": "x", "duration": 0.3, "zoom": 1.0}],
+            },
+        )
+        self._write_json(batch_path, {"jobs": [{"config": "episode.json"}]})
+
+        rel_batch_path = batch_path.relative_to(main.ROOT).as_posix()
+        rel_report_path = report_path.relative_to(main.ROOT).as_posix()
+        with patch("main.generate_image_prompts_from_config"):
+            main.build_batch_image_prompts(rel_batch_path, summary_report_path=rel_report_path)
+
+        report = json.loads(report_path.read_text(encoding="utf-8"))
+        self.assertEqual(report["mode"], "batch-prompts")
+        self.assertEqual(report["total_jobs"], 1)
+        self.assertEqual(report["success_count"], 1)
+        self.assertEqual(report["failure_count"], 0)
+        self.assertIn("duration_seconds", report)
+
 
 if __name__ == "__main__":
     unittest.main()
