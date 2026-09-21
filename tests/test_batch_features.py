@@ -364,6 +364,58 @@ class BatchFeatureTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             main.build_batch_image_prompts(rel_batch_path)
 
+    def test_batch_prompt_filename_pattern_is_applied(self):
+        batch_dir = self.tmp_dir / "batch-prompts-pattern"
+        cfg_path = batch_dir / "episode.json"
+        batch_path = batch_dir / "batch.json"
+        self._write_json(
+            cfg_path,
+            {
+                "project_title": "테스트",
+                "subtitle": "테스트",
+                "video": {"width": 320, "height": 180, "fps": 12, "fade_seconds": 0.1},
+                "image_prompt_output": "output/prompts.json",
+                "scenes": [{"source": "assets/images/x.png", "caption": "x", "duration": 0.3, "zoom": 1.0}],
+            },
+        )
+        self._write_json(
+            batch_path,
+            {
+                "prompt_filename_pattern": "{index2}_{job_slug}_{config}",
+                "jobs": [{"name": "Episode 01!", "config": "episode.json"}],
+            },
+        )
+
+        rel_batch_path = batch_path.relative_to(main.ROOT).as_posix()
+        with patch("main.generate_image_prompts_from_config") as mocked_prompts:
+            main.build_batch_image_prompts(rel_batch_path)
+
+        output_override = mocked_prompts.call_args.kwargs["output_override"]
+        self.assertEqual(Path(output_override).name, "01_Episode_01_episode.json")
+
+    def test_batch_prompt_filename_pattern_invalid_placeholder_is_rejected(self):
+        batch_dir = self.tmp_dir / "batch-prompts-pattern-invalid"
+        cfg_path = batch_dir / "episode.json"
+        batch_path = batch_dir / "batch.json"
+        self._write_json(
+            cfg_path,
+            {
+                "project_title": "테스트",
+                "subtitle": "테스트",
+                "video": {"width": 320, "height": 180, "fps": 12, "fade_seconds": 0.1},
+                "image_prompt_output": "output/prompts.json",
+                "scenes": [{"source": "assets/images/x.png", "caption": "x", "duration": 0.3, "zoom": 1.0}],
+            },
+        )
+        self._write_json(
+            batch_path,
+            {"prompt_filename_pattern": "{unknown}", "jobs": [{"config": "episode.json"}]},
+        )
+
+        rel_batch_path = batch_path.relative_to(main.ROOT).as_posix()
+        with self.assertRaises(ValueError):
+            main.build_batch_image_prompts(rel_batch_path)
+
     def test_batch_render_retries_failed_job(self):
         batch_dir = self.tmp_dir / "batch-retry-render"
         cfg_path = batch_dir / "episode.json"

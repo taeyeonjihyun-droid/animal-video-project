@@ -4,6 +4,7 @@ import argparse
 import copy
 import json
 import math
+import re
 from pathlib import Path
 from typing import Any, Tuple
 
@@ -115,6 +116,43 @@ def validate_prompt_output_value(cfg: dict, *, base_dir: Path) -> Path:
     if output_path.suffix.lower() != ".json":
         raise ValueError("image_prompt_output 파일 확장자는 .json이어야 합니다.")
     return output_path
+
+
+def slugify_filename_token(value: str) -> str:
+    token = re.sub(r"[^0-9A-Za-z가-힣._-]+", "_", value.strip())
+    token = token.strip("._")
+    return token or "job"
+
+
+def build_prompt_filename_from_pattern(
+    pattern: str,
+    *,
+    index: int,
+    job_name: str,
+    config_stem: str,
+    default_stem: str,
+) -> str:
+    try:
+        rendered = pattern.format(
+            index=index,
+            index2=f"{index:02d}",
+            job=job_name,
+            job_slug=slugify_filename_token(job_name),
+            config=config_stem,
+            stem=default_stem,
+        ).strip()
+    except KeyError as exc:
+        raise ValueError(
+            "prompt_filename_pattern에는 {index}, {index2}, {job}, {job_slug}, {config}, {stem}만 사용할 수 있습니다."
+        ) from exc
+
+    if not rendered:
+        raise ValueError("prompt_filename_pattern 결과 파일명이 비어 있습니다.")
+    if "/" in rendered or "\\" in rendered:
+        raise ValueError("prompt_filename_pattern 결과는 파일명만 허용됩니다(경로 구분자 불가).")
+    if rendered.startswith("."):
+        raise ValueError("prompt_filename_pattern 결과는 숨김 파일명으로 시작할 수 없습니다.")
+    return rendered if rendered.lower().endswith(".json") else f"{rendered}.json"
 
 
 def parse_args() -> argparse.Namespace:
@@ -664,6 +702,9 @@ def build_batch_image_prompts(batch_file_override: str | None = None, *, retry_f
     jobs = batch_cfg.get("jobs")
     if not isinstance(jobs, list) or not jobs:
         raise ValueError("배치 설정 파일에는 1개 이상의 jobs 목록이 필요합니다.")
+    filename_pattern = batch_cfg.get("prompt_filename_pattern")
+    if filename_pattern is not None and (not isinstance(filename_pattern, str) or not filename_pattern.strip()):
+        raise ValueError("prompt_filename_pattern은 비어 있지 않은 문자열이어야 합니다.")
 
     print(f"[배치 프롬프트 시작] {batch_path} / 총 {len(jobs)}개")
     reserved_outputs: set[Path] = set()
@@ -688,10 +729,21 @@ def build_batch_image_prompts(batch_file_override: str | None = None, *, retry_f
         if isinstance(overrides, dict) and overrides:
             cfg = deep_merge_dict(cfg, overrides)
         base_output = validate_prompt_output_value(cfg, base_dir=config_path.parent)
-        final_output_value = base_output
+        if filename_pattern:
+            custom_name = build_prompt_filename_from_pattern(
+                filename_pattern,
+                index=index,
+                job_name=str(job.get("name", f"batch-{index:02d}")),
+                config_stem=config_path.stem,
+                default_stem=base_output.stem or "scene_image_prompts",
+            )
+            desired_output_base = base_output.with_name(custom_name)
+        else:
+            desired_output_base = base_output
+        final_output_value = desired_output_base
         suffix_index = 2
         while final_output_value in reserved_outputs or final_output_value.exists():
-            final_output_value = with_batch_index_suffix(base_output, suffix_index, default_suffix=".json")
+            final_output_value = with_batch_index_suffix(desired_output_base, suffix_index, default_suffix=".json")
             suffix_index += 1
         reserved_outputs.add(final_output_value)
         name = str(job.get("name", f"batch-{index:02d}"))

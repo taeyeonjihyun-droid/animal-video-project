@@ -160,6 +160,7 @@ GitHub Actions에서도 동일하게 생성할 수 있습니다.
 
 ```json
 {
+  "prompt_filename_pattern": "{index2}_{job_slug}_prompts.json",
   "jobs": [
     {
       "name": "beach-episode-1",
@@ -175,6 +176,9 @@ GitHub Actions에서도 동일하게 생성할 수 있습니다.
   ]
 }
 ```
+
+`prompt_filename_pattern`(선택)을 사용하면 `batch-prompts` 모드에서 job별 프롬프트 파일명을 자동 규칙으로 만들 수 있습니다.  
+사용 가능한 변수: `{index}`, `{index2}`, `{job}`, `{job_slug}`, `{config}`, `{stem}`
 
 2) 배치 렌더링 실행:
 
@@ -211,6 +215,7 @@ GitHub Actions에서 배치 프롬프트만 생성:
 - `--batch-file`을 생략하면 기본값으로 `batch_config.json`을 사용합니다.
 - `--batch-file` 경로는 명령 실행 위치(현재 디렉터리) 기준 상대 경로이며, 프로젝트 폴더 내부 파일만 허용됩니다.
 - `--retry-failed`는 배치 작업 실패 시 job별 재시도 횟수를 지정합니다(0 이상의 정수).
+- `prompt_filename_pattern`을 지정하면 `batch-prompts` 모드에서 파일명 규칙을 커스터마이즈할 수 있습니다(파일명만 허용, `.json` 자동 보정).
 - `overrides`는 각 작업의 설정을 덮어쓸 때 사용합니다(예: `output`, `project_title`, `subtitle`).
 - `jobs[].config` 경로는 **배치 파일 위치 기준 상대 경로**로 해석됩니다.
 - 여러 작업에서 최종 출력 경로가 중복되거나, 이미 같은 경로의 파일이 존재하면(기본값/`overrides.output` 포함) 파일명에 `_02`처럼 번호를 붙여 덮어쓰기를 방지합니다.
