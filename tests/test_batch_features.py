@@ -485,11 +485,12 @@ class BatchFeatureTests(unittest.TestCase):
             main.build_batch_videos(rel_batch_path, summary_report_path=rel_report_path)
 
         report = json.loads(report_path.read_text(encoding="utf-8"))
-        self.assertEqual(report["schema_version"], "1.0")
+        self.assertEqual(report["schema_version"], "1.1")
         self.assertEqual(report["mode"], "batch-render")
         self.assertEqual(report["total_jobs"], 1)
         self.assertEqual(report["success_count"], 1)
         self.assertEqual(report["failure_count"], 0)
+        self.assertEqual(report["retry_successes"], [])
         self.assertIn("duration_seconds", report)
 
     def test_batch_prompts_summary_report_is_created(self):
@@ -515,12 +516,42 @@ class BatchFeatureTests(unittest.TestCase):
             main.build_batch_image_prompts(rel_batch_path, summary_report_path=rel_report_path)
 
         report = json.loads(report_path.read_text(encoding="utf-8"))
-        self.assertEqual(report["schema_version"], "1.0")
+        self.assertEqual(report["schema_version"], "1.1")
         self.assertEqual(report["mode"], "batch-prompts")
         self.assertEqual(report["total_jobs"], 1)
         self.assertEqual(report["success_count"], 1)
         self.assertEqual(report["failure_count"], 0)
+        self.assertEqual(report["retry_successes"], [])
         self.assertIn("duration_seconds", report)
+
+    def test_batch_render_summary_includes_retry_success_attempt(self):
+        batch_dir = self.tmp_dir / "batch-summary-retry-render"
+        cfg_path = batch_dir / "episode.json"
+        batch_path = batch_dir / "batch.json"
+        report_path = batch_dir / "output" / "retry_render_summary.json"
+        self._write_json(
+            cfg_path,
+            {
+                "project_title": "테스트",
+                "subtitle": "테스트",
+                "video": {"width": 320, "height": 180, "fps": 12, "fade_seconds": 0.1},
+                "output": "output/test.mp4",
+                "scenes": [{"source": "assets/images/x.png", "caption": "x", "duration": 0.3, "zoom": 1.0}],
+            },
+        )
+        self._write_json(batch_path, {"jobs": [{"name": "retry-job", "config": "episode.json"}]})
+
+        rel_batch_path = batch_path.relative_to(main.ROOT).as_posix()
+        rel_report_path = report_path.relative_to(main.ROOT).as_posix()
+        with patch("main.build_video_from_config") as mocked_build:
+            mocked_build.side_effect = [RuntimeError("first fail"), None]
+            main.build_batch_videos(rel_batch_path, retry_failed=1, summary_report_path=rel_report_path)
+
+        report = json.loads(report_path.read_text(encoding="utf-8"))
+        self.assertEqual(
+            report["retry_successes"],
+            [{"job": "retry-job", "succeeded_on_attempt": 2}],
+        )
 
 
 if __name__ == "__main__":

@@ -25,7 +25,7 @@ from moviepy import (
 
 ROOT = Path(__file__).resolve().parent
 CONFIG_PATH = ROOT / "config.json"
-BATCH_SUMMARY_SCHEMA_VERSION = "1.0"
+BATCH_SUMMARY_SCHEMA_VERSION = "1.1"
 
 
 def load_config() -> dict:
@@ -179,6 +179,7 @@ def write_batch_summary_report(
     success_count: int,
     failure_count: int,
     failed_jobs: list[str],
+    retry_successes: list[dict[str, Any]],
     duration_seconds: float,
 ) -> None:
     print(
@@ -195,6 +196,7 @@ def write_batch_summary_report(
         "success_count": success_count,
         "failure_count": failure_count,
         "failed_jobs": failed_jobs,
+        "retry_successes": retry_successes,
         "duration_seconds": round(duration_seconds, 3),
         "generated_at": datetime.now(UTC).isoformat(),
     }
@@ -736,6 +738,7 @@ def build_batch_videos(
     success_count = 0
     failure_count = 0
     failed_jobs: list[str] = []
+    retry_successes: list[dict[str, Any]] = []
     start_time = time.perf_counter()
     last_error: Exception | None = None
     for index, (name, config_path, cfg, output_base_dir, final_output_value) in enumerate(planned_jobs, start=1):
@@ -750,6 +753,11 @@ def build_batch_videos(
             print(f"[배치 시도] {name} attempt {attempt}/{max_attempts}")
             try:
                 build_video_from_config(cfg, output_base_dir=output_base_dir, output_path=final_output_value)
+                if attempt > 1:
+                    retry_successes.append({
+                        "job": name,
+                        "succeeded_on_attempt": attempt,
+                    })
                 break
             except Exception as exc:
                 if attempt >= max_attempts:
@@ -771,6 +779,7 @@ def build_batch_videos(
         success_count=success_count,
         failure_count=failure_count,
         failed_jobs=failed_jobs,
+        retry_successes=retry_successes,
         duration_seconds=duration_seconds,
     )
     if last_error is not None:
@@ -851,6 +860,7 @@ def build_batch_image_prompts(
     success_count = 0
     failure_count = 0
     failed_jobs: list[str] = []
+    retry_successes: list[dict[str, Any]] = []
     start_time = time.perf_counter()
     last_error: Exception | None = None
     for index, (name, config_path, cfg, output_base_dir, final_output_value) in enumerate(planned_jobs, start=1):
@@ -865,6 +875,11 @@ def build_batch_image_prompts(
             print(f"[배치 프롬프트 시도] {name} attempt {attempt}/{max_attempts}")
             try:
                 generate_image_prompts_from_config(cfg, output_override=str(final_output_value))
+                if attempt > 1:
+                    retry_successes.append({
+                        "job": name,
+                        "succeeded_on_attempt": attempt,
+                    })
                 break
             except Exception as exc:
                 if attempt >= max_attempts:
@@ -886,6 +901,7 @@ def build_batch_image_prompts(
         success_count=success_count,
         failure_count=failure_count,
         failed_jobs=failed_jobs,
+        retry_successes=retry_successes,
         duration_seconds=duration_seconds,
     )
     if last_error is not None:
