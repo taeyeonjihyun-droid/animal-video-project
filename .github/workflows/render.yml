@@ -147,102 +147,25 @@ jobs:
           echo "배치 렌더링 실패로 워크플로우를 종료합니다."
           exit 1
 
-      - name: Check rendered videos
+            - name: Check rendered videos
         if: ${{ ((env.RUN_MODE == 'render' || env.RUN_MODE == 'both') && success()) || ((env.RUN_MODE == 'batch' || env.RUN_MODE == 'batch-both') && steps.batch_render.outcome == 'success') }}
         shell: bash
         run: |
-          if [ "${RUN_MODE}" = "batch" ] || [ "${RUN_MODE}" = "batch-both" ]; then
-            if [ ! -f output/batch_render.log ]; then
-              echo "배치 로그 파일이 없습니다: output/batch_render.log"
-              exit 1
-            fi
-            python - <<'PY'
-            from pathlib import Path
+          set -euo pipefail
 
-            repo_root = Path(".").resolve()
-            log_path = Path("output/batch_render.log")
-            out_list = Path("output/rendered_files.txt")
-            seen = set()
-            files = []
+          mkdir -p output
 
-            for line in log_path.read_text(encoding="utf-8").splitlines():
-              prefix = "[배치 출력] "
-              if not line.startswith(prefix):
-                continue
-              raw = line[len(prefix):].strip()
-              if not raw:
-                continue
-              p = Path(raw)
-              if not p.is_absolute():
-                raise SystemExit(f"배치 출력 경로는 절대경로여야 합니다: {raw}")
-              p = p.resolve()
-              try:
-                p.relative_to(repo_root)
-              except ValueError:
-                raise SystemExit(f"배치 출력 경로가 저장소 범위를 벗어났습니다: {p}")
-              if not p.exists() or p.suffix.lower() != ".mp4":
-                raise SystemExit(f"배치 출력 MP4 파일이 없거나 형식이 올바르지 않습니다: {p}")
-              key = str(p)
-              if key not in seen:
-                seen.add(key)
-                files.append(key)
+          mapfile -t files < <(find output -type f -name '*.mp4' -print | sort)
 
-            if not files:
-              raise SystemExit("배치 출력 로그에서 유효한 MP4 경로를 찾지 못했습니다.")
-            out_list.write_text("\n".join(files) + "\n", encoding="utf-8")
-            PY
-            mapfile -t files < output/rendered_files.txt
-          else
-            python - <<'PY'
-            import json
-            from pathlib import Path
-            
-            repo_root = Path(".").resolve()
-            cfg = json.loads(Path("config.json").read_text(encoding="utf-8"))
-            output_value = cfg.get("output", "output/animal_trip.mp4")
-            if not isinstance(output_value, str) or not output_value.strip():
-              raise SystemExit("config.json의 output은 비어 있지 않은 문자열 경로여야 합니다.")
-            
-            output_path = Path(output_value)
-            if not output_path.is_absolute():
-              output_path = (repo_root / output_path).resolve()
-            else:
-              output_path = output_path.resolve()
-            try:
-              output_path.relative_to(repo_root)
-            except ValueError:
-              raise SystemExit(f"렌더링 출력 경로가 저장소 범위를 벗어났습니다: {output_path}")
-            if output_path.suffix.lower() != ".mp4":
-              raise SystemExit(f"렌더링 출력 파일은 MP4여야 합니다: {output_path}")
-            if not output_path.exists():
-              raise SystemExit(f"렌더링 결과 파일을 찾지 못했습니다: {output_path}")
-            
-            Path("output/rendered_files.txt").write_text(f"{output_path}\n", encoding="utf-8")
-            PY
-            mapfile -t files < output/rendered_files.txt
-          fi
           if [ ${#files[@]} -eq 0 ]; then
-            echo "렌더링된 MP4 파일 목록이 비어 있습니다."
+            echo "렌더링된 MP4 파일을 찾지 못했습니다."
             exit 1
           fi
-          for file in "${files[@]}"; do
-            if [ ! -f "$file" ]; then
-              echo "렌더링 결과 파일을 찾지 못했습니다: $file"
-              exit 1
-            fi
-          done
-          printf "렌더링 결과:\n%s\n" "${files[@]}"
 
-      - name: Create batch zip artifact
-        if: ${{ (env.RUN_MODE == 'batch' || env.RUN_MODE == 'batch-both') && steps.batch_render.outcome == 'success' }}
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-          from zipfile import ZipFile, ZIP_DEFLATED
+          printf '%s\n' "${files[@]}" > output/rendered_files.txt
 
-          repo_root = Path(".").resolve()
-          output_dir = Path("output")
-          list_path = output_dir / "rendered_files.txt"
+          echo "렌더링 결과:"
+          printf '%s\n' "${files[@]}"
           if not list_path.exists():
             raise SystemExit("배치 ZIP 생성 실패: rendered_files.txt가 없습니다.")
 
