@@ -547,8 +547,8 @@ def build_batch_videos(batch_file_override: str | None = None) -> None:
         raise ValueError("배치 설정 파일에는 1개 이상의 jobs 목록이 필요합니다.")
 
     print(f"[배치 시작] {batch_path} / 총 {len(jobs)}개")
-    total_jobs = len(jobs)
-    used_outputs: set[Path] = set()
+    reserved_outputs: set[Path] = set()
+    planned_jobs: list[tuple[str, Path, dict, Path, Path]] = []
     for index, job in enumerate(jobs, start=1):
         if not isinstance(job, dict):
             raise ValueError(f"jobs[{index}]는 객체(dict)여야 합니다.")
@@ -568,24 +568,23 @@ def build_batch_videos(batch_file_override: str | None = None) -> None:
             raise ValueError(f"jobs[{index}].overrides는 객체(dict)여야 합니다.")
         if isinstance(overrides, dict) and overrides:
             cfg = deep_merge_dict(cfg, overrides)
-        effective_output_value = validate_output_value(cfg, base_dir=config_path.parent)
-        final_output_value = effective_output_value
-        if total_jobs > 1 and final_output_value in used_outputs:
-            suffix_index = index
-            candidate = with_batch_index_suffix(effective_output_value, suffix_index)
-            while candidate in used_outputs:
-                suffix_index += 1
-                candidate = with_batch_index_suffix(effective_output_value, suffix_index)
-            final_output_value = candidate
+        base_output = validate_output_value(cfg, base_dir=config_path.parent)
+        final_output_value = base_output
+        suffix_index = 2
+        while final_output_value in reserved_outputs:
+            final_output_value = with_batch_index_suffix(base_output, suffix_index)
+            suffix_index += 1
+        reserved_outputs.add(final_output_value)
+        name = str(job.get("name", f"batch-{index:02d}"))
+        planned_jobs.append((name, config_path, cfg, config_path.parent, final_output_value))
+
+    for index, (name, config_path, cfg, output_base_dir, final_output_value) in enumerate(planned_jobs, start=1):
         try:
-            cfg["output"] = str(final_output_value.relative_to(config_path.parent))
+            cfg["output"] = str(final_output_value.relative_to(output_base_dir))
         except ValueError:
             cfg["output"] = str(final_output_value)
-        used_outputs.add(final_output_value)
-
-        name = str(job.get("name", f"batch-{index:02d}"))
         print(f"[배치 작업 {index}/{len(jobs)}] {name} ({config_path})")
-        build_video_from_config(cfg, output_base_dir=config_path.parent)
+        build_video_from_config(cfg, output_base_dir=output_base_dir)
         print(f"[배치 출력] {final_output_value}")
     print("[배치 완료] 모든 영상 렌더링이 끝났습니다.")
 
