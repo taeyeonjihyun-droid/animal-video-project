@@ -668,6 +668,53 @@ class BatchFeatureTests(unittest.TestCase):
         self.assertIn("실패: fail-job", captured.getvalue())
         self.assertIn("성공: success-job", captured.getvalue())
 
+    def test_batch_prompts_continue_after_failure_and_exit_non_zero(self):
+        batch_dir = self.tmp_dir / "batch-summary-failure-prompts"
+        cfg_path = batch_dir / "episode.json"
+        batch_path = batch_dir / "batch.json"
+        report_path = batch_dir / "output" / "failure_prompts_summary.json"
+        self._write_json(
+            cfg_path,
+            {
+                "project_title": "테스트",
+                "subtitle": "테스트",
+                "video": {"width": 320, "height": 180, "fps": 12, "fade_seconds": 0.1},
+                "image_prompt_output": "output/prompts.json",
+                "scenes": [{"source": "assets/images/x.png", "caption": "x", "duration": 0.3, "zoom": 1.0}],
+            },
+        )
+        self._write_json(
+            batch_path,
+            {
+                "jobs": [
+                    {"name": "fail-prompts", "config": "episode.json"},
+                    {"name": "success-prompts", "config": "episode.json", "overrides": {"image_prompt_output": "output/success.json"}},
+                ]
+            },
+        )
+
+        rel_batch_path = batch_path.relative_to(main.ROOT).as_posix()
+        rel_report_path = report_path.relative_to(main.ROOT).as_posix()
+        with patch("main.generate_image_prompts_from_config") as mocked_prompts:
+            mocked_prompts.side_effect = [RuntimeError("always fail"), None]
+            captured = io.StringIO()
+            with self.assertRaises(SystemExit) as exc_info, redirect_stdout(captured):
+                main.build_batch_image_prompts(rel_batch_path, retry_failed=0, summary_report_path=rel_report_path)
+
+        self.assertEqual(exc_info.exception.code, 1)
+        self.assertEqual(mocked_prompts.call_count, 2)
+
+        report = json.loads(report_path.read_text(encoding="utf-8"))
+        self.assertEqual(report["failure_count"], 1)
+        self.assertEqual(report["success_count"], 1)
+        self.assertEqual(report["failed_jobs"], ["fail-prompts"])
+        self.assertEqual(report["stopped_on_failure"], False)
+        self.assertEqual(report["job_results"][0]["status"], "failure")
+        self.assertEqual(report["job_results"][1]["status"], "success")
+        self.assertIn("[배치 프롬프트 작업 요약]", captured.getvalue())
+        self.assertIn("실패: fail-prompts", captured.getvalue())
+        self.assertIn("성공: success-prompts", captured.getvalue())
+
 
 if __name__ == "__main__":
     unittest.main()

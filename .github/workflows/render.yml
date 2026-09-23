@@ -227,11 +227,29 @@ jobs:
           shutil.rmtree(target_root, ignore_errors=True)
           target_root.mkdir(parents=True, exist_ok=True)
 
-          files = sorted(
-              path for path in output_root.rglob("*.mp4")
-              if "render_artifacts" not in path.parts
-          )
           is_batch_mode = "${{ env.RUN_MODE }}" in {"batch", "batch-both"}
+          files = []
+
+          if is_batch_mode:
+              log_path = output_root / "batch_render.log"
+              if log_path.exists():
+                  seen = set()
+                  for line in log_path.read_text(encoding="utf-8").splitlines():
+                      prefix = "[배치 출력] "
+                      if not line.startswith(prefix):
+                          continue
+                      source = Path(line[len(prefix):].strip()).resolve()
+                      if str(source) in seen:
+                          continue
+                      if source.exists() and source.suffix.lower() == ".mp4":
+                          seen.add(str(source))
+                          files.append(source)
+          else:
+              files = sorted(
+                  path for path in output_root.rglob("*.mp4")
+                  if "render_artifacts" not in path.parts
+              )
+
           if not files and not is_batch_mode:
               raise SystemExit("렌더링된 MP4 파일을 찾지 못했습니다.")
 
@@ -326,7 +344,7 @@ jobs:
         if: ${{ (env.RUN_MODE == 'batch' || env.RUN_MODE == 'batch-both') && (steps.batch_render.outcome == 'success' || steps.batch_render.outcome == 'failure') }}
         uses: actions/upload-artifact@v4
         with:
-          name: rendered-animal-video
+          name: batch-rendered-animal-video
           path: output/render_artifacts/**/*
           if-no-files-found: ignore
           retention-days: 7

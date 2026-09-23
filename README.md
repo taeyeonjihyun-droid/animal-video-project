@@ -59,7 +59,8 @@ animal_trip_video_project/
    - `batch-both`: 배치 설정 파일 기준 프롬프트 JSON 생성 + 영상 순차 렌더링
 5. 실행할 브랜치를 확인하고 **Run workflow**를 누릅니다.
 6. 실행이 끝나면 run 상세 화면의 **Artifacts**에서 결과를 다운로드합니다.
-   - 영상: `rendered-animal-video`
+   - 단일 렌더링 영상: `rendered-animal-video`
+   - 배치 렌더링 영상 묶음: `batch-rendered-animal-video`
    - 프롬프트: `scene-image-prompts`
    - 배치 프롬프트: `batch-scene-image-prompts` (batch-prompts/batch-both 모드 성공 시)
    - 배치 ZIP: `batch-rendered-videos-zip` (batch/batch-both 모드에서 생성된 MP4가 있을 때)
@@ -262,7 +263,7 @@ python batch.py --batch-config batch.json --summary-report output/batch_render_s
 7. 필요하면 `batch_retry_count`와 `batch_summary_report`를 설정합니다.
 8. 브랜치를 확인한 뒤 **Run workflow**를 클릭합니다.
 9. 실행이 끝나면 run 상세 화면 하단 **Artifacts**에서 결과를 다운로드합니다.
-   - `rendered-animal-video`: 생성된 MP4 묶음
+   - `batch-rendered-animal-video`: 생성된 MP4 묶음
    - `batch-rendered-videos-zip`: 배치 MP4 ZIP
    - `batch-run-logs`: 배치 로그
    - `batch-execution-summary`: 배치 요약 JSON

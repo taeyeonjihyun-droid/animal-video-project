@@ -251,7 +251,7 @@ def validate_video_config(cfg: dict, *, config_path: Path | None = None) -> None
         validate_scene_entry(scene, index=index)
 
 
-def rebase_repo_relative_path_value(
+def resolve_path_value_for_base(
     path_value: str,
     *,
     from_base_dir: Path,
@@ -279,7 +279,7 @@ def normalize_batch_overrides(
     for key in ("output", "image_prompt_output", "bgm"):
         value = normalized.get(key)
         if isinstance(value, str) and value.strip():
-            normalized[key] = rebase_repo_relative_path_value(
+            normalized[key] = resolve_path_value_for_base(
                 value,
                 from_base_dir=batch_base_dir,
                 to_base_dir=config_base_dir,
@@ -292,7 +292,7 @@ def normalize_batch_overrides(
                 continue
             source = scene.get("source")
             if isinstance(source, str) and source.strip():
-                scene["source"] = rebase_repo_relative_path_value(
+                scene["source"] = resolve_path_value_for_base(
                     source,
                     from_base_dir=batch_base_dir,
                     to_base_dir=config_base_dir,
