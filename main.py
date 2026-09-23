@@ -55,12 +55,23 @@ def load_config_from_path(path: Path) -> dict:
 
 
 def load_config_for_cli(config_path_override: str | None = None) -> tuple[dict, Path]:
-    selected_path = config_path_override or CONFIG_PATH.relative_to(ROOT).as_posix()
-    config_path = resolve_repo_relative_path(
-        selected_path,
-        base_dir=ROOT,
-        must_exist=True,
-    )
+    if config_path_override:
+        try:
+            config_path = resolve_repo_relative_path(
+                config_path_override,
+                base_dir=Path.cwd().resolve(),
+                must_exist=True,
+            )
+        except ValueError:
+            if config_path_override.strip() != CONFIG_PATH.name:
+                raise
+            config_path = resolve_repo_relative_path(
+                CONFIG_PATH.name,
+                base_dir=ROOT,
+                must_exist=True,
+            )
+    else:
+        config_path = CONFIG_PATH
     return load_config_from_path(config_path), config_path
 
 
