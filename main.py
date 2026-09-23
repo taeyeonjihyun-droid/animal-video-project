@@ -164,6 +164,8 @@ def validate_render_media_paths(
             base_dir=base_dir,
             field_name=f"scenes[{index}].source",
         )
+        if source_path.suffix.lower() not in {".mp4", ".mov", ".mkv", ".webm", ".m4v"} and "start" in scene:
+            raise ValueError(f"scenes[{index}].start는 비디오 장면에서만 사용할 수 있습니다.")
         scene_sources.append(source_path)
 
     return {
@@ -722,7 +724,7 @@ def build_video_from_config(
 
     # BGM이 있으면 전체 길이에 맞춰 반복 후 믹싱
     bgm_path = resolved_paths["bgm"]
-    if bgm_path is not None and bgm_path.exists():
+    if bgm_path is not None:
         bgm = AudioFileClip(str(bgm_path))
         bgm = bgm.with_effects([
             afx.AudioLoop(duration=final.duration),
@@ -735,7 +737,7 @@ def build_video_from_config(
         else:
             final = final.with_audio(bgm)
     else:
-        print(f"[안내] BGM 없음: {cfg.get('bgm', '')}. 원본 오디오만으로 생성합니다.")
+        print("[안내] BGM 설정이 없어 원본 오디오만으로 생성합니다.")
 
     if output_path is not None:
         out = resolve_repo_relative_path(

@@ -653,6 +653,22 @@ class BatchFeatureTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             main.validate_render_media_paths(cfg, base_dir=render_dir)
 
+    def test_validate_render_media_paths_rejects_start_on_image_scene(self):
+        render_dir = self.tmp_dir / "render-assets-image-start"
+        image_path = render_dir / "assets" / "images" / "scene.png"
+        image_path.parent.mkdir(parents=True, exist_ok=True)
+        image_path.write_bytes(b"png")
+
+        cfg = {
+            "output": "output/final.mp4",
+            "scenes": [
+                {"source": "assets/images/scene.png", "duration": 1.0, "start": 0.5},
+            ],
+        }
+
+        with self.assertRaises(ValueError):
+            main.validate_render_media_paths(cfg, base_dir=render_dir)
+
 
 if __name__ == "__main__":
     unittest.main()
