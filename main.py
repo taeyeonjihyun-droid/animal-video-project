@@ -682,20 +682,23 @@ def build_video_from_config(
     resolved_paths = validate_render_media_paths(cfg, base_dir=output_base_dir)
 
     clips = []
+    clip_crossfades: list[float] = []
     for i, scene in enumerate(cfg["scenes"], start=1):
         source = resolved_paths["scene_sources"][i - 1]
         duration = float(scene.get("duration", 7.5))
         caption = scene.get("caption", "")
         zoom = float(scene.get("zoom", 1.04))
         start_time = float(scene.get("start", 0.0))
+        effective_crossfade = 0.0 if not clips else min(crossfade_seconds, duration / 2)
 
         if source.suffix.lower() in {".mp4", ".mov", ".mkv", ".webm", ".m4v"} and source.exists():
             clip = make_video_scene(source, duration, caption, size, fade_seconds, start_time)
         else:
             clip = make_image_scene(source, duration, caption, zoom, size, i, fade_seconds)
-        if clips and crossfade_seconds > 0:
-            clip = clip.with_effects([vfx.CrossFadeIn(min(crossfade_seconds, duration / 2))])
+        if effective_crossfade > 0:
+            clip = clip.with_effects([vfx.CrossFadeIn(effective_crossfade)])
         clips.append(clip)
+        clip_crossfades.append(effective_crossfade)
 
     timeline: list[Any] = []
     current_start = 0.0
@@ -703,7 +706,7 @@ def build_video_from_config(
         if index == 0:
             start_at = 0.0
         else:
-            start_at = max(0.0, current_start - crossfade_seconds)
+            start_at = max(0.0, current_start - clip_crossfades[index])
         timeline.append(clip.with_start(start_at))
         current_start = start_at + clip.duration
 
