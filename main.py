@@ -55,14 +55,11 @@ def load_config_from_path(path: Path) -> dict:
 
 
 def load_config_for_cli(config_path_override: str | None = None) -> tuple[dict, Path]:
-    config_path = (
-        resolve_repo_relative_path(
-            config_path_override,
-            base_dir=Path.cwd().resolve(),
-            must_exist=True,
-        )
-        if config_path_override
-        else CONFIG_PATH
+    selected_path = config_path_override or CONFIG_PATH.relative_to(ROOT).as_posix()
+    config_path = resolve_repo_relative_path(
+        selected_path,
+        base_dir=ROOT,
+        must_exist=True,
     )
     return load_config_from_path(config_path), config_path
 
@@ -807,16 +804,14 @@ def build_video_from_config(
 
     # BGM이 있으면 전체 길이에 맞춰 반복 후 믹싱
     bgm_value = cfg.get("bgm", "")
-    bgm_path = (
-        resolve_repo_relative_path(
+    bgm_path = None
+    if isinstance(bgm_value, str) and bgm_value.strip():
+        bgm_path = resolve_repo_relative_path(
             str(bgm_value),
             base_dir=config_base_dir,
             must_exist=False,
         )
-        if isinstance(bgm_value, str) and bgm_value.strip()
-        else ROOT / "__missing_bgm__"
-    )
-    if bgm_path.exists():
+    if bgm_path is not None and bgm_path.exists():
         bgm = AudioFileClip(str(bgm_path))
         bgm = bgm.with_effects([
             afx.AudioLoop(duration=final.duration),
@@ -829,7 +824,8 @@ def build_video_from_config(
         else:
             final = final.with_audio(bgm)
     else:
-        print(f"[안내] BGM 없음: {bgm_path}. 무음 영상으로 생성합니다.")
+        missing_bgm = bgm_path if bgm_path is not None else "설정 없음"
+        print(f"[안내] BGM 없음: {missing_bgm}. 무음 영상으로 생성합니다.")
 
     if output_path is not None:
         out = resolve_repo_relative_path(
