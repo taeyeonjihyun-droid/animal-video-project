@@ -718,9 +718,9 @@ def generate_ai_images(
     cfg, config_path = load_config_for_cli(config_path_override)
     validate_video_config(cfg, config_path=config_path)
 
-    api_key = os.environ.get("OPENAI_API_KEY", "").strip()
+    api_key = os.environ.get("AI_IMAGE_API_KEY", "").strip() or os.environ.get("OPENAI_API_KEY", "").strip()
     if not api_key:
-        raise ValueError("OPENAI_API_KEY 환경변수가 필요합니다. 코드에 키를 넣지 말고 환경변수로 설정하세요.")
+        raise ValueError("AI_IMAGE_API_KEY 또는 OPENAI_API_KEY 환경변수가 필요합니다. 코드에 키를 넣지 말고 환경변수로 설정하세요.")
     base_url = os.environ.get("OPENAI_IMAGE_BASE_URL", DEFAULT_OPENAI_IMAGE_BASE_URL).strip() or DEFAULT_OPENAI_IMAGE_BASE_URL
 
     images_dir, generated_config_path, model_name = resolve_ai_image_generation_settings(

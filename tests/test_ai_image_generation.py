@@ -128,6 +128,26 @@ class AIImageGenerationTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 main.generate_ai_images(config_path_override=rel_config_path)
 
+    def test_generate_ai_images_accepts_provider_neutral_api_key(self):
+        config_path = self.tmp_dir / "episode.json"
+        self._write_json(
+            config_path,
+            {
+                "project_title": "테스트",
+                "subtitle": "중립 키",
+                "video": {"width": 1080, "height": 1920, "fps": 30, "fade_seconds": 0.1},
+                "output": "output/test.mp4",
+                "scenes": [{"source": "assets/images/one.png", "caption": "첫 장면", "duration": 0.5, "zoom": 1.0}],
+            },
+        )
+
+        rel_config_path = config_path.relative_to(main.ROOT).as_posix()
+        with patch.dict(os.environ, {"AI_IMAGE_API_KEY": "provider-key"}, clear=True):
+            with patch("main.generate_ai_image_bytes", return_value=self._png_bytes()) as mocked_generate:
+                main.generate_ai_images(config_path_override=rel_config_path)
+
+        self.assertEqual(mocked_generate.call_args.kwargs["api_key"], "provider-key")
+
     def test_validate_video_config_rejects_missing_video_source(self):
         config_path = self.tmp_dir / "episode.json"
         self._write_json(

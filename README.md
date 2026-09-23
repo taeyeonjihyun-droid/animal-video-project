@@ -177,6 +177,12 @@ API 키는 코드나 저장소에 넣지 말고 **환경변수**로만 설정하
 export OPENAI_API_KEY="YOUR_API_KEY"
 ```
 
+OpenAI가 아닌 호환 게이트웨이를 쓰는 경우에는 다음처럼 중립 이름을 써도 됩니다.
+
+```bash
+export AI_IMAGE_API_KEY="YOUR_API_KEY"
+```
+
 선택적으로 OpenAI 호환 게이트웨이를 바꾸려면:
 
 ```bash
