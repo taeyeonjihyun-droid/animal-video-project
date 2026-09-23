@@ -25,11 +25,21 @@ from moviepy import (
 
 ROOT = Path(__file__).resolve().parent
 CONFIG_PATH = ROOT / "config.json"
+DEFAULT_BATCH_CONFIG_PATH = ROOT / "batch.json"
+LEGACY_BATCH_CONFIG_PATH = ROOT / "batch_config.json"
 BATCH_SUMMARY_SCHEMA_VERSION = "1.2"
 
 
 def load_config() -> dict:
     return load_config_from_path(CONFIG_PATH)
+
+
+def default_batch_file_value() -> str:
+    if DEFAULT_BATCH_CONFIG_PATH.exists():
+        return DEFAULT_BATCH_CONFIG_PATH.relative_to(ROOT).as_posix()
+    if LEGACY_BATCH_CONFIG_PATH.exists():
+        return LEGACY_BATCH_CONFIG_PATH.relative_to(ROOT).as_posix()
+    return DEFAULT_BATCH_CONFIG_PATH.name
 
 
 def load_json(path: Path) -> Any:
@@ -42,6 +52,19 @@ def load_config_from_path(path: Path) -> dict:
     if not isinstance(data, dict):
         raise ValueError(f"설정 파일 최상위는 객체(dict)여야 합니다: {path}")
     return data
+
+
+def load_config_for_cli(config_path_override: str | None = None) -> tuple[dict, Path]:
+    config_path = (
+        resolve_repo_relative_path(
+            config_path_override,
+            base_dir=Path.cwd().resolve(),
+            must_exist=True,
+        )
+        if config_path_override
+        else CONFIG_PATH
+    )
+    return load_config_from_path(config_path), config_path
 
 
 def resolve_repo_relative_path(
@@ -170,6 +193,79 @@ def resolve_summary_report_path(path_value: str, *, base_dir: Path) -> Path:
     return report_path
 
 
+def validate_scene_entry(scene: Any, *, index: int) -> None:
+    if not isinstance(scene, dict):
+        raise ValueError(f"scenes[{index}]는 객체(dict)여야 합니다.")
+    source = scene.get("source")
+    if not isinstance(source, str) or not source.strip():
+        raise ValueError(f"scenes[{index}].source는 비어 있지 않은 문자열이어야 합니다.")
+    caption = scene.get("caption", "")
+    if not isinstance(caption, str):
+        raise ValueError(f"scenes[{index}].caption은 문자열이어야 합니다.")
+    duration = scene.get("duration", 7.5)
+    try:
+        duration_value = float(duration)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"scenes[{index}].duration은 숫자여야 합니다.") from exc
+    if duration_value <= 0:
+        raise ValueError(f"scenes[{index}].duration은 0보다 커야 합니다.")
+    zoom = scene.get("zoom", 1.04)
+    try:
+        zoom_value = float(zoom)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"scenes[{index}].zoom은 숫자여야 합니다.") from exc
+    if zoom_value <= 0:
+        raise ValueError(f"scenes[{index}].zoom은 0보다 커야 합니다.")
+
+
+def validate_video_config(cfg: dict, *, config_path: Path | None = None) -> None:
+    config_label = str(config_path) if config_path is not None else "config.json"
+    if not isinstance(cfg, dict):
+        raise ValueError(f"설정 파일 최상위는 객체(dict)여야 합니다: {config_label}")
+
+    video_cfg = cfg.get("video")
+    if not isinstance(video_cfg, dict):
+        raise ValueError(f"{config_label}의 video는 객체(dict)여야 합니다.")
+
+    for key in ("width", "height"):
+        if key not in video_cfg:
+            raise ValueError(f"{config_label}의 video.{key} 값이 필요합니다.")
+        try:
+            numeric_value = int(video_cfg[key])
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"{config_label}의 video.{key}는 정수여야 합니다.") from exc
+        if numeric_value <= 0:
+            raise ValueError(f"{config_label}의 video.{key}는 1 이상의 값이어야 합니다.")
+
+    if "fps" in video_cfg:
+        try:
+            fps_value = int(video_cfg["fps"])
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"{config_label}의 video.fps는 정수여야 합니다.") from exc
+        if fps_value <= 0:
+            raise ValueError(f"{config_label}의 video.fps는 1 이상의 값이어야 합니다.")
+
+    scenes = cfg.get("scenes")
+    if not isinstance(scenes, list):
+        raise ValueError(f"{config_label}의 scenes는 장면 객체(dict) 목록(list)이어야 합니다.")
+    if not scenes:
+        raise ValueError(f"{config_label}의 scenes가 비어 있습니다. 최소 1개 장면이 필요합니다.")
+    for index, scene in enumerate(scenes, start=1):
+        validate_scene_entry(scene, index=index)
+
+
+def print_batch_summary_lines(job_results: list[dict[str, Any]]) -> None:
+    print("[배치 작업 요약]")
+    for result in job_results:
+        status_label = "성공" if result["status"] == "success" else "실패"
+        output_path = result.get("output_path") or "-"
+        error = result.get("error")
+        if error:
+            print(f"- {status_label}: {result['job']} -> {output_path} ({error})")
+        else:
+            print(f"- {status_label}: {result['job']} -> {output_path}")
+
+
 def write_batch_summary_report(
     *,
     report_path: Path | None,
@@ -212,6 +308,12 @@ def parse_args() -> argparse.Namespace:
     """Parse CLI flags and return an argparse.Namespace for execution mode selection."""
     parser = argparse.ArgumentParser(description="Animal video renderer / scene prompt generator")
     parser.add_argument(
+        "--config",
+        type=str,
+        default=None,
+        help="렌더링 또는 프롬프트 생성에 사용할 설정 JSON 경로 (기본: config.json)",
+    )
+    parser.add_argument(
         "--generate-image-prompts",
         action="store_true",
         help="config.json의 scenes를 기반으로 AI 이미지 프롬프트를 생성합니다.",
@@ -236,7 +338,7 @@ def parse_args() -> argparse.Namespace:
         "--batch-file",
         type=str,
         default=None,
-        help="배치 설정 JSON 경로 (현재 디렉터리 기준 상대 경로, 프로젝트 내부 파일만 허용, 기본: batch_config.json)",
+        help="배치 설정 JSON 경로 (현재 디렉터리 기준 상대 경로, 프로젝트 내부 파일만 허용, 기본: batch.json / batch_config.json)",
     )
     parser.add_argument(
         "--retry-failed",
@@ -299,10 +401,15 @@ def build_scene_prompt(
     )
 
 
-def generate_image_prompts(output_override: str | None = None) -> None:
-    cfg = load_config()
+def generate_image_prompts(
+    output_override: str | None = None,
+    *,
+    config_path_override: str | None = None,
+) -> None:
+    cfg, config_path = load_config_for_cli(config_path_override)
     generate_image_prompts_from_config(
         cfg=cfg,
+        config_path=config_path,
         output_override=output_override,
     )
 
@@ -310,8 +417,10 @@ def generate_image_prompts(output_override: str | None = None) -> None:
 def generate_image_prompts_from_config(
     cfg: dict,
     *,
+    config_path: Path | None = None,
     output_override: str | None = None,
 ) -> None:
+    validate_video_config(cfg, config_path=config_path)
     vcfg = cfg.get("video", {})
     width = int(vcfg.get("width", 1280))
     height = int(vcfg.get("height", 720))
@@ -319,10 +428,6 @@ def generate_image_prompts_from_config(
         raise ValueError("video.width와 video.height는 1 이상의 값이어야 합니다.")
 
     scenes = cfg.get("scenes", [])
-    if not isinstance(scenes, list) or not all(isinstance(scene, dict) for scene in scenes):
-        raise ValueError("config.json의 scenes는 장면 객체(dict) 목록(list)이어야 합니다.")
-    if not scenes:
-        raise ValueError("config.json의 scenes가 비어 있습니다. 최소 1개 장면이 필요합니다.")
     project_title = str(cfg.get("project_title", ""))
     subtitle = str(cfg.get("subtitle", ""))
     total = max(1, len(scenes))
@@ -357,7 +462,7 @@ def generate_image_prompts_from_config(
         raise ValueError("프롬프트 출력 경로는 비어 있을 수 없습니다.")
     out = resolve_repo_relative_path(
         selected_output,
-        base_dir=Path.cwd().resolve() if output_override else ROOT,
+        base_dir=Path.cwd().resolve() if output_override else (config_path.parent if config_path else ROOT),
         must_exist=False,
         allow_parent_create=True,
     )
@@ -603,17 +708,21 @@ def make_video_scene(
     return clip
 
 
-def build_video():
-    cfg = load_config()
-    build_video_from_config(cfg)
+def build_video(config_path_override: str | None = None):
+    cfg, config_path = load_config_for_cli(config_path_override)
+    build_video_from_config(cfg, config_path=config_path)
 
 
 def build_video_from_config(
     cfg: dict,
     *,
-    output_base_dir: Path = ROOT,
+    config_path: Path | None = None,
+    output_base_dir: Path | None = None,
     output_path: Path | None = None,
 ) -> None:
+    validate_video_config(cfg, config_path=config_path)
+    config_base_dir = config_path.parent if config_path is not None else ROOT
+    resolved_output_base_dir = output_base_dir or config_base_dir
     vcfg = cfg["video"]
     size = (int(vcfg["width"]), int(vcfg["height"]))
     fps = int(vcfg.get("fps", 30))
@@ -621,7 +730,11 @@ def build_video_from_config(
 
     clips = []
     for i, scene in enumerate(cfg["scenes"], start=1):
-        source = ROOT / scene["source"]
+        source = resolve_repo_relative_path(
+            str(scene["source"]),
+            base_dir=config_base_dir,
+            must_exist=False,
+        )
         duration = float(scene.get("duration", 7.5))
         caption = scene.get("caption", "")
         zoom = float(scene.get("zoom", 1.04))
@@ -643,7 +756,16 @@ def build_video_from_config(
     final = CompositeVideoClip([final, title], size=size).with_duration(final.duration)
 
     # BGM이 있으면 전체 길이에 맞춰 반복 후 믹싱
-    bgm_path = ROOT / cfg.get("bgm", "")
+    bgm_value = cfg.get("bgm", "")
+    bgm_path = (
+        resolve_repo_relative_path(
+            str(bgm_value),
+            base_dir=config_base_dir,
+            must_exist=False,
+        )
+        if isinstance(bgm_value, str) and bgm_value.strip()
+        else ROOT / "__missing_bgm__"
+    )
     if bgm_path.exists():
         bgm = AudioFileClip(str(bgm_path))
         bgm = bgm.with_effects([
@@ -662,11 +784,11 @@ def build_video_from_config(
     if output_path is not None:
         out = resolve_repo_relative_path(
             str(output_path),
-            base_dir=output_base_dir,
+            base_dir=resolved_output_base_dir,
             must_exist=False,
         )
     else:
-        out = validate_output_value(cfg, base_dir=output_base_dir)
+        out = validate_output_value(cfg, base_dir=resolved_output_base_dir)
     if out.suffix.lower() != ".mp4":
         raise ValueError("output 파일 확장자는 .mp4여야 합니다.")
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -689,7 +811,7 @@ def build_batch_videos(
     retry_failed: int = 0,
     summary_report_path: str | None = None,
 ) -> None:
-    batch_file = batch_file_override or "batch_config.json"
+    batch_file = batch_file_override or default_batch_file_value()
     batch_path = resolve_repo_relative_path(
         batch_file,
         base_dir=Path.cwd().resolve(),
@@ -723,12 +845,14 @@ def build_batch_videos(
             must_exist=True,
         )
         cfg = load_config_from_path(config_path)
+        validate_video_config(cfg, config_path=config_path)
         has_overrides = "overrides" in job
         overrides = job.get("overrides", {})
         if has_overrides and not isinstance(overrides, dict):
             raise ValueError(f"jobs[{index}].overrides는 객체(dict)여야 합니다.")
         if isinstance(overrides, dict) and overrides:
             cfg = deep_merge_dict(cfg, overrides)
+            validate_video_config(cfg, config_path=config_path)
         base_output = validate_output_value(cfg, base_dir=config_path.parent)
         final_output_value = base_output
         suffix_index = 2
@@ -745,7 +869,6 @@ def build_batch_videos(
     retry_successes: list[dict[str, Any]] = []
     job_results: list[dict[str, Any]] = []
     start_time = time.perf_counter()
-    last_error: Exception | None = None
     for index, (name, config_path, cfg, output_base_dir, final_output_value) in enumerate(planned_jobs, start=1):
         try:
             cfg["output"] = str(final_output_value.relative_to(output_base_dir))
@@ -755,11 +878,17 @@ def build_batch_videos(
         print(f"[배치 출력 예정] {final_output_value}")
         max_attempts = retry_failed + 1
         attempts_used = 0
+        job_succeeded = False
         for attempt in range(1, max_attempts + 1):
             attempts_used = attempt
             print(f"[배치 시도] {name} attempt {attempt}/{max_attempts}")
             try:
-                build_video_from_config(cfg, output_base_dir=output_base_dir, output_path=final_output_value)
+                build_video_from_config(
+                    cfg,
+                    config_path=config_path,
+                    output_base_dir=output_base_dir,
+                    output_path=final_output_value,
+                )
                 if attempt > 1:
                     retry_successes.append({
                         "job": name,
@@ -775,12 +904,13 @@ def build_batch_videos(
                     "output_path": str(final_output_value),
                     "error": None,
                 })
+                job_succeeded = True
                 break
             except Exception as exc:
                 if attempt >= max_attempts:
-                    last_error = exc
                     failure_count += 1
                     failed_jobs.append(name)
+                    print(f"[배치 실패] {name}: {exc}")
                     job_results.append({
                         "job": name,
                         "status": "failure",
@@ -793,11 +923,11 @@ def build_batch_videos(
                     })
                     break
                 print(f"[배치 재시도] {name}: {exc}")
-        if last_error is not None:
-            break
-        print(f"[배치 출력] {final_output_value}")
-        success_count += 1
+        if job_succeeded:
+            print(f"[배치 출력] {final_output_value}")
+            success_count += 1
     duration_seconds = time.perf_counter() - start_time
+    print_batch_summary_lines(job_results)
     write_batch_summary_report(
         report_path=report_path,
         mode="batch-render",
@@ -808,11 +938,11 @@ def build_batch_videos(
         failed_jobs=failed_jobs,
         retry_successes=retry_successes,
         job_results=job_results,
-        stopped_on_failure=last_error is not None,
+        stopped_on_failure=False,
         duration_seconds=duration_seconds,
     )
-    if last_error is not None:
-        raise last_error
+    if failure_count > 0:
+        raise SystemExit(1)
     print("[배치 완료] 모든 영상 렌더링이 끝났습니다.")
 
 
@@ -822,7 +952,7 @@ def build_batch_image_prompts(
     retry_failed: int = 0,
     summary_report_path: str | None = None,
 ) -> None:
-    batch_file = batch_file_override or "batch_config.json"
+    batch_file = batch_file_override or default_batch_file_value()
     batch_path = resolve_repo_relative_path(
         batch_file,
         base_dir=Path.cwd().resolve(),
@@ -859,12 +989,14 @@ def build_batch_image_prompts(
             must_exist=True,
         )
         cfg = load_config_from_path(config_path)
+        validate_video_config(cfg, config_path=config_path)
         has_overrides = "overrides" in job
         overrides = job.get("overrides", {})
         if has_overrides and not isinstance(overrides, dict):
             raise ValueError(f"jobs[{index}].overrides는 객체(dict)여야 합니다.")
         if isinstance(overrides, dict) and overrides:
             cfg = deep_merge_dict(cfg, overrides)
+            validate_video_config(cfg, config_path=config_path)
         base_output = validate_prompt_output_value(cfg, base_dir=config_path.parent)
         if filename_pattern:
             custom_name = build_prompt_filename_from_pattern(
@@ -892,7 +1024,6 @@ def build_batch_image_prompts(
     retry_successes: list[dict[str, Any]] = []
     job_results: list[dict[str, Any]] = []
     start_time = time.perf_counter()
-    last_error: Exception | None = None
     for index, (name, config_path, cfg, output_base_dir, final_output_value) in enumerate(planned_jobs, start=1):
         try:
             cfg["image_prompt_output"] = str(final_output_value.relative_to(output_base_dir))
@@ -902,11 +1033,16 @@ def build_batch_image_prompts(
         print(f"[배치 프롬프트 출력 예정] {final_output_value}")
         max_attempts = retry_failed + 1
         attempts_used = 0
+        job_succeeded = False
         for attempt in range(1, max_attempts + 1):
             attempts_used = attempt
             print(f"[배치 프롬프트 시도] {name} attempt {attempt}/{max_attempts}")
             try:
-                generate_image_prompts_from_config(cfg, output_override=str(final_output_value))
+                generate_image_prompts_from_config(
+                    cfg,
+                    config_path=config_path,
+                    output_override=str(final_output_value),
+                )
                 if attempt > 1:
                     retry_successes.append({
                         "job": name,
@@ -922,12 +1058,13 @@ def build_batch_image_prompts(
                     "output_path": str(final_output_value),
                     "error": None,
                 })
+                job_succeeded = True
                 break
             except Exception as exc:
                 if attempt >= max_attempts:
-                    last_error = exc
                     failure_count += 1
                     failed_jobs.append(name)
+                    print(f"[배치 프롬프트 실패] {name}: {exc}")
                     job_results.append({
                         "job": name,
                         "status": "failure",
@@ -940,11 +1077,11 @@ def build_batch_image_prompts(
                     })
                     break
                 print(f"[배치 프롬프트 재시도] {name}: {exc}")
-        if last_error is not None:
-            break
-        print(f"[배치 프롬프트 출력] {final_output_value}")
-        success_count += 1
+        if job_succeeded:
+            print(f"[배치 프롬프트 출력] {final_output_value}")
+            success_count += 1
     duration_seconds = time.perf_counter() - start_time
+    print_batch_summary_lines(job_results)
     write_batch_summary_report(
         report_path=report_path,
         mode="batch-prompts",
@@ -955,11 +1092,11 @@ def build_batch_image_prompts(
         failed_jobs=failed_jobs,
         retry_successes=retry_successes,
         job_results=job_results,
-        stopped_on_failure=last_error is not None,
+        stopped_on_failure=False,
         duration_seconds=duration_seconds,
     )
-    if last_error is not None:
-        raise last_error
+    if failure_count > 0:
+        raise SystemExit(1)
     print("[배치 프롬프트 완료] 모든 프롬프트 생성이 끝났습니다.")
 
 
@@ -978,6 +1115,6 @@ if __name__ == "__main__":
             summary_report_path=args.summary_report,
         )
     elif args.generate_image_prompts:
-        generate_image_prompts(args.prompts_output)
+        generate_image_prompts(args.prompts_output, config_path_override=args.config)
     else:
-        build_video()
+        build_video(args.config)

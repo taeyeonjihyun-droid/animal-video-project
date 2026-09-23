@@ -62,12 +62,13 @@ animal_trip_video_project/
    - 영상: `rendered-animal-video`
    - 프롬프트: `scene-image-prompts`
    - 배치 프롬프트: `batch-scene-image-prompts` (batch-prompts/batch-both 모드 성공 시)
-   - 배치 ZIP: `batch-rendered-videos-zip` (batch/batch-both 모드 성공 시)
+   - 배치 ZIP: `batch-rendered-videos-zip` (batch/batch-both 모드에서 생성된 MP4가 있을 때)
    - 배치 요약: `batch-execution-summary` (batch/batch-prompts/batch-both에서 `batch_summary_report=true`일 때)
    - 배치 로그: `batch-run-logs` (batch/batch-prompts/batch-both 실행 시)
-   - 배치 모드 사용 시 `batch_file` 입력(기본 `batch_config.json`)으로 파일 경로를 지정할 수 있습니다.
+   - 배치 모드 사용 시 `batch_file` 입력(기본 `batch.json`)으로 파일 경로를 지정할 수 있습니다.
    - 배치 모드(`batch`, `batch-prompts`, `batch-both`)에서는 `batch_retry_count`로 job별 실패 재시도 횟수(0~3)를 지정할 수 있습니다.
    - 배치 모드(`batch`, `batch-prompts`, `batch-both`)에서는 `batch_summary_report`로 실행 시간/성공 개수 요약 JSON 생성 여부를 선택할 수 있습니다.
+   - 배치 렌더링에서 일부 job이 실패해도 **나머지 job은 계속 실행**되며, 성공한 MP4와 로그가 먼저 업로드된 뒤 워크플로가 실패로 표시됩니다.
 
 참고:
 - 실행 시간은 장면 수/길이에 따라 보통 몇 분 정도 걸릴 수 있습니다.
@@ -80,13 +81,17 @@ Python 3.10 이상 권장.
 ```bash
 pip install -r requirements.txt
 python main.py
+python main.py --config config.json
+python batch.py --batch-config batch.json
 ```
 
-완성 파일:
+단일 렌더링 완성 파일:
 
 ```text
 output/animal_trip.mp4
 ```
+
+배치 실행 시에는 `batch.json`에 정의된 각 job의 MP4가 `output/` 아래에 생성됩니다.
 
 ## 3. 이미지 대신 짧은 AI 영상 사용
 
@@ -134,6 +139,7 @@ Veo, Gemini, Runway, Firefly 등에서 만든 짧은 클립을 넣으면
 
 ```bash
 python main.py --generate-image-prompts
+python main.py --config config.json --generate-image-prompts
 ```
 
 생성 결과:
@@ -158,98 +164,121 @@ GitHub Actions에서도 동일하게 생성할 수 있습니다.
 
 ## 7. 쇼츠 배치 생성 (여러 편 자동 제작)
 
-여러 개의 설정 파일을 한 번에 순차 렌더링할 수 있습니다.
+여러 개의 설정 파일을 한 번에 순차 렌더링할 수 있습니다. 기본 예시 파일은 프로젝트 루트의 `batch.json`입니다.
 
-1) 프로젝트 루트에 배치 설정 파일(예: `batch_config.json`)을 만듭니다.
+### 7-1. `batch.json` 형식
+
+각 job은 최소 `config`를 가져야 하며, 필요하면 `overrides.output`으로 결과 파일명을 개별 지정할 수 있습니다.
 
 ```json
 {
-  "prompt_filename_pattern": "{index2}_{job_slug}_prompts.json",
   "jobs": [
     {
-      "name": "beach-episode-1",
-      "config": "config.json"
+      "name": "short-01",
+      "config": "config.json",
+      "overrides": {
+        "project_title": "아기 동물 쇼츠 1편",
+        "subtitle": "첫 번째 세로 쇼츠 예시",
+        "output": "output/short-01.mp4"
+      }
     },
     {
-      "name": "beach-episode-2",
-      "config": "configs/episode2.json",
+      "name": "short-02",
+      "config": "config.json",
       "overrides": {
-        "output": "output/episode2.mp4"
+        "project_title": "아기 동물 쇼츠 2편",
+        "subtitle": "두 번째 세로 쇼츠 예시",
+        "output": "output/short-02.mp4"
+      }
+    },
+    {
+      "name": "short-03",
+      "config": "config.json",
+      "overrides": {
+        "project_title": "아기 동물 쇼츠 3편",
+        "subtitle": "세 번째 세로 쇼츠 예시",
+        "output": "output/short-03.mp4"
       }
     }
   ]
 }
 ```
 
-`prompt_filename_pattern`(선택)을 사용하면 `batch-prompts` 모드에서 job별 프롬프트 파일명을 자동 규칙으로 만들 수 있습니다.  
-사용 가능한 변수: `{index}`, `{index2}`, `{job}`, `{job_slug}`, `{config}`, `{stem}`
+추가 옵션:
 
-2) 배치 렌더링 실행:
+- `jobs[].config`: **배치 파일 위치 기준 상대 경로** 또는 저장소 내부 절대 경로
+- `jobs[].overrides`: 원본 설정 일부를 job별로 덮어쓰기
+- `prompt_filename_pattern`: `batch-prompts` 모드에서 프롬프트 파일명 규칙 지정  
+  사용 가능 변수: `{index}`, `{index2}`, `{job}`, `{job_slug}`, `{config}`, `{stem}`
 
-```bash
-python main.py --batch-render --batch-file batch_config.json
-```
+여러 job이 같은 출력명을 가리키거나 이미 파일이 존재하면 `_02`, `_03`처럼 번호를 붙여 덮어쓰기를 막습니다.
 
-실패 재시도를 적용하려면:
+### 7-2. 로컬 명령
 
-```bash
-python main.py --batch-render --batch-file batch_config.json --retry-failed 2
-```
-
-실행 요약 리포트를 저장하려면:
+단일 렌더링:
 
 ```bash
-python main.py --batch-render --batch-file batch_config.json --summary-report output/batch_render_summary.json
+python main.py
+python main.py --config config.json
 ```
 
-GitHub Actions에서 배치 실행:
+배치 렌더링:
 
-1. **Actions** → **Render animal video (수동 실행)** → **Run workflow**
-2. `run_mode`를 `batch`로 선택
-3. 필요하면 `batch_file` 입력값을 수정(예: `configs/batch_week1.json`)
-4. 필요하면 `batch_retry_count`를 설정(예: `2`)
-5. 필요하면 `batch_summary_report`를 설정(기본 `true`)
-6. 완료 후 **Artifacts**에서 결과 다운로드
-   - `rendered-animal-video`: `render`/`both` 모드에서는 단일 MP4, `batch`/`batch-both` 모드에서는 `output/` 접두사를 제거한 정규화 상대경로 구조의 여러 MP4 파일
-   - `batch-rendered-videos-zip`: 배치 결과 MP4 ZIP 묶음
-7. 실패 시 run 요약 화면에 **배치 실패 원인 요약 로그**가 자동으로 출력되며, `batch-failure-log` 아티팩트로 원본 로그를 받을 수 있습니다.
+```bash
+python batch.py --batch-config batch.json
+```
 
-GitHub Actions에서 배치 프롬프트만 생성:
+기존 CLI도 그대로 사용할 수 있습니다.
 
-1. **Actions** → **Render animal video (수동 실행)** → **Run workflow**
-2. `run_mode`를 `batch-prompts`로 선택
-3. 필요하면 `batch_file` 입력값을 수정(예: `configs/batch_week1.json`)
-4. 필요하면 `batch_retry_count`를 설정(예: `2`)
-5. 필요하면 `batch_summary_report`를 설정(기본 `true`)
-6. 완료 후 **Artifacts**에서 `batch-scene-image-prompts` 다운로드
+```bash
+python main.py --batch-render --batch-file batch.json
+```
 
-GitHub Actions에서 배치 프롬프트+렌더링 함께 실행:
+실패 재시도:
 
-1. **Actions** → **Render animal video (수동 실행)** → **Run workflow**
-2. `run_mode`를 `batch-both`로 선택
-3. 필요하면 `batch_file` 입력값을 수정(예: `configs/batch_week1.json`)
-4. 필요하면 `batch_retry_count`를 설정(예: `2`)
-5. 필요하면 `batch_summary_report`를 설정(기본 `true`)
-6. 완료 후 **Artifacts**에서 아래 결과를 함께 다운로드
-   - `rendered-animal-video`
-   - `batch-rendered-videos-zip`
-   - `batch-scene-image-prompts`
-   - `batch-execution-summary` (`batch_summary_report=true`일 때)
-   - `batch-run-logs`
+```bash
+python batch.py --batch-config batch.json --retry-failed 2
+```
 
-옵션:
-- `--batch-file`을 생략하면 기본값으로 `batch_config.json`을 사용합니다.
-- `--batch-file` 경로는 명령 실행 위치(현재 디렉터리) 기준 상대 경로이며, 프로젝트 폴더 내부 파일만 허용됩니다.
-- `--retry-failed`는 배치 작업 실패 시 job별 재시도 횟수를 지정합니다(0 이상의 정수).
-- `--summary-report`를 지정하면 배치 실행 시간/성공 개수/실패 개수 요약 JSON을 저장합니다.
-  - 고정 스키마 버전 필드: `schema_version` (현재 `1.2`)
-  - 재시도 성공 결과 필드: `retry_successes` (`job`, `succeeded_on_attempt`)
-  - job 단위 실행 결과 필드: `job_results` (`job`, `status`, `attempts_used`, `max_attempts`, `retried`, `succeeded_on_attempt`, `output_path`, `error`)
-  - 중도 중단 여부 필드: `stopped_on_failure`
-- `prompt_filename_pattern`을 지정하면 `batch-prompts` 모드에서 파일명 규칙을 커스터마이즈할 수 있습니다(파일명만 허용, `.json` 자동 보정).
-- `overrides`는 각 작업의 설정을 덮어쓸 때 사용합니다(예: `output`, `project_title`, `subtitle`).
-- `jobs[].config` 경로는 **배치 파일 위치 기준 상대 경로**로 해석됩니다.
-- 여러 작업에서 최종 출력 경로가 중복되거나, 이미 같은 경로의 파일이 존재하면(기본값/`overrides.output` 포함) 파일명에 `_02`처럼 번호를 붙여 덮어쓰기를 방지합니다.
+요약 리포트 저장:
+
+```bash
+python batch.py --batch-config batch.json --summary-report output/batch_render_summary.json
+```
+
+### 7-3. GitHub Actions에서 배치 실행하는 정확한 순서
+
+1. `config.json`, `batch.json`, 필요한 `assets/` 파일을 **커밋/푸시**합니다.
+2. GitHub 저장소 상단에서 **Actions** 탭을 엽니다.
+3. 왼쪽에서 **Render animal video (수동 실행)** 워크플로를 클릭합니다.
+4. 오른쪽 상단 **Run workflow** 버튼을 누릅니다.
+5. `run_mode`에서 원하는 모드를 고릅니다.
+   - `render`: 기본 단일 렌더링
+   - `batch`: 여러 편 일괄 렌더링
+   - `batch-prompts`: 여러 편 프롬프트 JSON만 생성
+   - `batch-both`: 프롬프트 생성 + 여러 편 렌더링
+6. 배치 모드라면 `batch_file`에 사용할 배치 파일 경로를 입력합니다(기본 `batch.json`).
+7. 필요하면 `batch_retry_count`와 `batch_summary_report`를 설정합니다.
+8. 브랜치를 확인한 뒤 **Run workflow**를 클릭합니다.
+9. 실행이 끝나면 run 상세 화면 하단 **Artifacts**에서 결과를 다운로드합니다.
+   - `rendered-animal-video`: 생성된 MP4 묶음
+   - `batch-rendered-videos-zip`: 배치 MP4 ZIP
+   - `batch-run-logs`: 배치 로그
+   - `batch-execution-summary`: 배치 요약 JSON
+
+### 7-4. 일부 job이 실패할 때 동작
+
+- 각 job은 독립적으로 검증·실행됩니다.
+- 한 job이 실패해도 **뒤의 job은 계속 실행**됩니다.
+- 콘솔과 요약 JSON에 성공/실패 여부, 출력 경로, 오류 메시지가 함께 남습니다.
+- 모든 job이 끝난 뒤 하나라도 실패가 있으면 **프로세스 종료 코드는 1**이므로 로컬 명령과 GitHub Actions 모두 실패로 표시됩니다.
+- GitHub Actions에서는 실패로 끝나더라도 **성공한 MP4와 로그 아티팩트가 먼저 업로드**됩니다.
+
+### 7-5. 운영 팁
+
+- 원본 `config.json`, `batch.json`, 추가 설정 파일, `assets/`는 반드시 Git에 커밋해 두세요.
+- 생성된 `output/*.mp4` 파일은 용량이 크므로 **커밋하지 않는 것을 권장**합니다.
+- `--summary-report`를 사용하면 `schema_version`, `retry_successes`, `job_results`, `stopped_on_failure` 필드가 포함된 JSON 요약을 남길 수 있습니다.
 
 ### `batch-execution-summary` JSON 예시
 

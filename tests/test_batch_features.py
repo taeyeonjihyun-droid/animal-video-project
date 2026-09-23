@@ -1,7 +1,9 @@
+import io
 import json
 import shutil
 import tempfile
 import unittest
+from contextlib import redirect_stdout
 from pathlib import Path
 from unittest.mock import patch
 
@@ -564,7 +566,7 @@ class BatchFeatureTests(unittest.TestCase):
         self.assertEqual(report["job_results"][0]["attempts_used"], 2)
         self.assertEqual(report["job_results"][0]["retried"], True)
 
-    def test_batch_render_summary_includes_failure_job_result(self):
+    def test_batch_render_continues_after_failure_and_reports_summary(self):
         batch_dir = self.tmp_dir / "batch-summary-failure-render"
         cfg_path = batch_dir / "episode.json"
         batch_path = batch_dir / "batch.json"
@@ -579,32 +581,51 @@ class BatchFeatureTests(unittest.TestCase):
                 "scenes": [{"source": "assets/images/x.png", "caption": "x", "duration": 0.3, "zoom": 1.0}],
             },
         )
-        self._write_json(batch_path, {"jobs": [{"name": "fail-job", "config": "episode.json"}]})
+        self._write_json(
+            batch_path,
+            {
+                "jobs": [
+                    {"name": "fail-job", "config": "episode.json"},
+                    {"name": "success-job", "config": "episode.json", "overrides": {"output": "output/success.mp4"}},
+                ]
+            },
+        )
 
         rel_batch_path = batch_path.relative_to(main.ROOT).as_posix()
         rel_report_path = report_path.relative_to(main.ROOT).as_posix()
         with patch("main.build_video_from_config") as mocked_build:
-            mocked_build.side_effect = RuntimeError("always fail")
-            with self.assertRaises(RuntimeError):
-                main.build_batch_videos(rel_batch_path, retry_failed=1, summary_report_path=rel_report_path)
+            mocked_build.side_effect = [RuntimeError("always fail"), None]
+            captured = io.StringIO()
+            with self.assertRaises(SystemExit) as exc_info, redirect_stdout(captured):
+                main.build_batch_videos(rel_batch_path, retry_failed=0, summary_report_path=rel_report_path)
+
+        self.assertEqual(exc_info.exception.code, 1)
+        self.assertEqual(mocked_build.call_count, 2)
 
         report = json.loads(report_path.read_text(encoding="utf-8"))
         self.assertEqual(report["failure_count"], 1)
+        self.assertEqual(report["success_count"], 1)
         self.assertEqual(report["failed_jobs"], ["fail-job"])
-        self.assertEqual(report["stopped_on_failure"], True)
+        self.assertEqual(report["stopped_on_failure"], False)
+        self.assertEqual(len(report["job_results"]), 2)
         self.assertEqual(
             report["job_results"][0],
             {
                 "job": "fail-job",
                 "status": "failure",
-                "attempts_used": 2,
-                "max_attempts": 2,
-                "retried": True,
+                "attempts_used": 1,
+                "max_attempts": 1,
+                "retried": False,
                 "succeeded_on_attempt": None,
                 "output_path": str((batch_dir / "output" / "test.mp4").resolve()),
                 "error": "always fail",
             },
         )
+        self.assertEqual(report["job_results"][1]["job"], "success-job")
+        self.assertEqual(report["job_results"][1]["status"], "success")
+        self.assertIn("[배치 작업 요약]", captured.getvalue())
+        self.assertIn("실패: fail-job", captured.getvalue())
+        self.assertIn("성공: success-job", captured.getvalue())
 
 
 if __name__ == "__main__":

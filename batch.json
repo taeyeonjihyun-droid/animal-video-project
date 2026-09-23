@@ -1,0 +1,31 @@
+{
+  "jobs": [
+    {
+      "name": "short-01",
+      "config": "config.json",
+      "overrides": {
+        "project_title": "아기 동물 쇼츠 1편",
+        "subtitle": "첫 번째 세로 쇼츠 예시",
+        "output": "output/short-01.mp4"
+      }
+    },
+    {
+      "name": "short-02",
+      "config": "config.json",
+      "overrides": {
+        "project_title": "아기 동물 쇼츠 2편",
+        "subtitle": "두 번째 세로 쇼츠 예시",
+        "output": "output/short-02.mp4"
+      }
+    },
+    {
+      "name": "short-03",
+      "config": "config.json",
+      "overrides": {
+        "project_title": "아기 동물 쇼츠 3편",
+        "subtitle": "세 번째 세로 쇼츠 예시",
+        "output": "output/short-03.mp4"
+      }
+    }
+  ]
+}
