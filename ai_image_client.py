@@ -3,12 +3,24 @@ from __future__ import annotations
 import base64
 import json
 from urllib import error, request
+from urllib.parse import urlparse
 
 DEFAULT_OPENAI_IMAGE_BASE_URL = "https://api.openai.com/v1"
 
 
 class AIImageGenerationError(RuntimeError):
     pass
+
+
+def validate_generated_image_url(image_url: str, base_url: str) -> None:
+    parsed_image = urlparse(image_url)
+    parsed_base = urlparse(base_url)
+    if parsed_image.scheme not in {"http", "https"}:
+        raise AIImageGenerationError("생성된 이미지 URL은 http/https만 허용됩니다.")
+    if not parsed_image.hostname or not parsed_base.hostname:
+        raise AIImageGenerationError("생성된 이미지 URL 또는 API base URL 호스트 검증에 실패했습니다.")
+    if parsed_image.hostname != parsed_base.hostname:
+        raise AIImageGenerationError("생성된 이미지 URL 호스트가 허용된 API 호스트와 다릅니다.")
 
 
 def generate_openai_compatible_image(
@@ -68,6 +80,7 @@ def generate_openai_compatible_image(
 
     image_url = item.get("url")
     if isinstance(image_url, str) and image_url:
+        validate_generated_image_url(image_url, base_url)
         try:
             with request.urlopen(image_url, timeout=timeout_seconds) as response:
                 return response.read()

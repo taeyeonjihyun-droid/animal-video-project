@@ -136,6 +136,21 @@ class AIImageGenerationTests(unittest.TestCase):
         request_arg = mocked_urlopen.call_args.args[0]
         self.assertEqual(request_arg.full_url, "https://api.openai.com/v1/images/generations")
 
+    def test_openai_compatible_image_rejects_untrusted_download_host(self):
+        payload = json.dumps(
+            {"data": [{"url": "https://internal.example.local/generated.png"}]}
+        ).encode("utf-8")
+
+        with patch("ai_image_client.request.urlopen", return_value=_FakeResponse(payload)):
+            with self.assertRaises(ai_image_client.AIImageGenerationError):
+                ai_image_client.generate_openai_compatible_image(
+                    prompt="test prompt",
+                    model="gpt-image-1",
+                    size="1024x1024",
+                    api_key="dummy-key",
+                    base_url="https://api.openai.com/v1",
+                )
+
 
 if __name__ == "__main__":
     unittest.main()
