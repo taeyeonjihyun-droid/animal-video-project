@@ -4,6 +4,7 @@ import argparse
 import copy
 import json
 import math
+import os
 import re
 import time
 from datetime import UTC, datetime
@@ -23,11 +24,18 @@ from moviepy import (
     afx,
 )
 
+from ai_image_client import (
+    AIImageGenerationError,
+    DEFAULT_OPENAI_IMAGE_BASE_URL,
+    generate_openai_compatible_image,
+)
+
 ROOT = Path(__file__).resolve().parent
 CONFIG_PATH = ROOT / "config.json"
 DEFAULT_BATCH_CONFIG_PATH = ROOT / "batch.json"
 LEGACY_BATCH_CONFIG_PATH = ROOT / "batch_config.json"
 BATCH_SUMMARY_SCHEMA_VERSION = "1.2"
+DEFAULT_AI_IMAGE_MODEL = "gpt-image-1"
 
 
 def load_config() -> dict:
@@ -149,6 +157,33 @@ def validate_prompt_output_value(cfg: dict, *, base_dir: Path) -> Path:
     )
     if output_path.suffix.lower() != ".json":
         raise ValueError("image_prompt_output 파일 확장자는 .json이어야 합니다.")
+    return output_path
+
+
+def validate_json_output_path(path_value: str, *, base_dir: Path) -> Path:
+    if not isinstance(path_value, str) or not path_value.strip():
+        raise ValueError("출력 JSON 경로는 비어 있지 않은 문자열이어야 합니다.")
+    output_path = resolve_repo_relative_path(
+        path_value,
+        base_dir=base_dir,
+        must_exist=False,
+        allow_parent_create=True,
+    )
+    if output_path.suffix.lower() != ".json":
+        raise ValueError("출력 JSON 파일 확장자는 .json이어야 합니다.")
+    return output_path
+
+
+def validate_output_directory_path(path_value: str, *, base_dir: Path) -> Path:
+    if not isinstance(path_value, str) or not path_value.strip():
+        raise ValueError("출력 디렉터리 경로는 비어 있지 않은 문자열이어야 합니다.")
+    output_path = resolve_repo_relative_path(
+        path_value,
+        base_dir=base_dir,
+        must_exist=False,
+        allow_parent_create=True,
+    )
+    output_path.mkdir(parents=True, exist_ok=True)
     return output_path
 
 
@@ -324,6 +359,44 @@ def print_batch_summary_lines(title: str, job_results: list[dict[str, Any]]) -> 
             print(f"- {status_label}: {result['job']} -> {output_path}")
 
 
+def choose_ai_image_size(width: int, height: int) -> str:
+    if width <= 0 or height <= 0:
+        raise ValueError("이미지 크기 계산을 위해 video.width와 video.height는 1 이상이어야 합니다.")
+    if height > width:
+        return "1024x1536"
+    if width > height:
+        return "1536x1024"
+    return "1024x1024"
+
+
+def build_image_generation_prompt(scene_prompt: str, negative_prompt: str) -> str:
+    negative = negative_prompt.strip()
+    if not negative:
+        return scene_prompt
+    return f"{scene_prompt}\n\nAvoid: {negative}"
+
+
+def relative_path_text(from_dir: Path, to_path: Path) -> str:
+    return Path(os.path.relpath(to_path, from_dir)).as_posix()
+
+
+def generate_ai_image_bytes(
+    *,
+    prompt: str,
+    model: str,
+    size: str,
+    api_key: str,
+    base_url: str,
+) -> bytes:
+    return generate_openai_compatible_image(
+        prompt=prompt,
+        model=model,
+        size=size,
+        api_key=api_key,
+        base_url=base_url,
+    )
+
+
 def write_batch_summary_report(
     *,
     report_path: Path | None,
@@ -377,10 +450,33 @@ def parse_args() -> argparse.Namespace:
         help="config.json의 scenes를 기반으로 AI 이미지 프롬프트를 생성합니다.",
     )
     parser.add_argument(
+        "--generate-ai-images",
+        action="store_true",
+        help="장면 프롬프트를 사용해 AI 이미지를 생성하고 파생 config.json을 저장합니다.",
+    )
+    parser.add_argument(
         "--prompts-output",
         type=str,
         default=None,
         help="프롬프트 JSON 출력 경로 (프로젝트 내부 경로, 기본: output/scene_image_prompts.json)",
+    )
+    parser.add_argument(
+        "--generated-images-dir",
+        type=str,
+        default=None,
+        help="생성된 AI 이미지 저장 디렉터리 (기본: output/generated_ai_images)",
+    )
+    parser.add_argument(
+        "--generated-config-output",
+        type=str,
+        default=None,
+        help="생성된 이미지 경로를 반영한 파생 config JSON 경로 (기본: output/generated_ai_config.json)",
+    )
+    parser.add_argument(
+        "--image-model",
+        type=str,
+        default=None,
+        help=f"이미지 생성 모델명 (기본: {DEFAULT_AI_IMAGE_MODEL})",
     )
     parser.add_argument(
         "--batch-render",
@@ -413,10 +509,22 @@ def parse_args() -> argparse.Namespace:
     args = parser.parse_args()
     if args.prompts_output and not args.generate_image_prompts:
         parser.error("--prompts-output는 --generate-image-prompts와 함께 사용해야 합니다.")
+    if args.generated_images_dir and not args.generate_ai_images:
+        parser.error("--generated-images-dir는 --generate-ai-images와 함께 사용해야 합니다.")
+    if args.generated_config_output and not args.generate_ai_images:
+        parser.error("--generated-config-output은 --generate-ai-images와 함께 사용해야 합니다.")
+    if args.image_model and not args.generate_ai_images:
+        parser.error("--image-model은 --generate-ai-images와 함께 사용해야 합니다.")
     if args.batch_file and not (args.batch_render or args.batch_generate_image_prompts):
         parser.error("--batch-file은 --batch-render 또는 --batch-generate-image-prompts와 함께 사용해야 합니다.")
     if args.batch_render and args.generate_image_prompts:
         parser.error("--batch-render와 --generate-image-prompts는 동시에 사용할 수 없습니다.")
+    if args.generate_ai_images and args.generate_image_prompts:
+        parser.error("--generate-ai-images와 --generate-image-prompts는 동시에 사용할 수 없습니다.")
+    if args.generate_ai_images and args.batch_render:
+        parser.error("--generate-ai-images와 --batch-render는 동시에 사용할 수 없습니다.")
+    if args.generate_ai_images and args.batch_generate_image_prompts:
+        parser.error("--generate-ai-images와 --batch-generate-image-prompts는 동시에 사용할 수 없습니다.")
     if args.batch_generate_image_prompts and args.generate_image_prompts:
         parser.error("--batch-generate-image-prompts와 --generate-image-prompts는 동시에 사용할 수 없습니다.")
     if args.batch_generate_image_prompts and args.batch_render:
@@ -539,6 +647,135 @@ def generate_image_prompts_from_config(
     print(f"[완료] 장면 프롬프트 저장: {out}")
     for item in prompt_items:
         print(f"- Scene {item['scene_index']:02d}: {item['prompt']}")
+
+
+def resolve_ai_image_generation_settings(
+    cfg: dict,
+    *,
+    config_path: Path,
+    images_dir_override: str | None,
+    generated_config_override: str | None,
+    model_override: str | None,
+) -> tuple[Path, Path, str]:
+    image_cfg = cfg.get("image_generation", {})
+    if image_cfg is not None and not isinstance(image_cfg, dict):
+        raise ValueError("image_generation 설정은 객체(dict)여야 합니다.")
+
+    images_dir_value = (
+        images_dir_override
+        if images_dir_override
+        else image_cfg.get("output_dir", "output/generated_ai_images")
+    )
+    generated_config_value = (
+        generated_config_override
+        if generated_config_override
+        else image_cfg.get("generated_config_output", "output/generated_ai_config.json")
+    )
+    model_value = (
+        model_override
+        if model_override
+        else image_cfg.get("model", DEFAULT_AI_IMAGE_MODEL)
+    )
+
+    images_dir = validate_output_directory_path(images_dir_value, base_dir=Path.cwd().resolve() if images_dir_override else config_path.parent)
+    generated_config_path = validate_json_output_path(
+        generated_config_value,
+        base_dir=Path.cwd().resolve() if generated_config_override else config_path.parent,
+    )
+    if not isinstance(model_value, str) or not model_value.strip():
+        raise ValueError("이미지 생성 모델명은 비어 있지 않은 문자열이어야 합니다.")
+    return images_dir, generated_config_path, model_value.strip()
+
+
+def generate_ai_images(
+    *,
+    config_path_override: str | None = None,
+    images_dir_override: str | None = None,
+    generated_config_override: str | None = None,
+    model_override: str | None = None,
+) -> None:
+    cfg, config_path = load_config_for_cli(config_path_override)
+    validate_video_config(cfg, config_path=config_path)
+
+    api_key = os.environ.get("OPENAI_API_KEY", "").strip()
+    if not api_key:
+        raise ValueError("OPENAI_API_KEY 환경변수가 필요합니다. 코드에 키를 넣지 말고 환경변수로 설정하세요.")
+    base_url = os.environ.get("OPENAI_IMAGE_BASE_URL", DEFAULT_OPENAI_IMAGE_BASE_URL).strip() or DEFAULT_OPENAI_IMAGE_BASE_URL
+
+    images_dir, generated_config_path, model_name = resolve_ai_image_generation_settings(
+        cfg,
+        config_path=config_path,
+        images_dir_override=images_dir_override,
+        generated_config_override=generated_config_override,
+        model_override=model_override,
+    )
+
+    prompt_items = []
+    vcfg = cfg.get("video", {})
+    width = int(vcfg.get("width", 1280))
+    height = int(vcfg.get("height", 720))
+    size = choose_ai_image_size(width, height)
+    project_title = str(cfg.get("project_title", ""))
+    subtitle = str(cfg.get("subtitle", ""))
+    scenes = cfg.get("scenes", [])
+    total = max(1, len(scenes))
+    generated_cfg = copy.deepcopy(cfg)
+
+    print(f"[AI 이미지 생성 시작] config={config_path} model={model_name} size={size}")
+    for scene_index, scene in enumerate(scenes, start=1):
+        scene_prompt = build_scene_prompt(
+            scene=scene,
+            scene_index=scene_index,
+            total_scenes=total,
+            project_title=project_title,
+            subtitle=subtitle,
+            width=width,
+            height=height,
+        )
+        negative_prompt = "blurry, low quality, noisy, distorted anatomy, deformed face, extra limbs, text, logo, watermark"
+        prompt_items.append(
+            {
+                "scene_index": scene_index,
+                "prompt": scene_prompt,
+                "negative_prompt": negative_prompt,
+            }
+        )
+        output_path = images_dir / f"scene_{scene_index:02d}.png"
+        try:
+            image_bytes = generate_ai_image_bytes(
+                prompt=build_image_generation_prompt(scene_prompt, negative_prompt),
+                model=model_name,
+                size=size,
+                api_key=api_key,
+                base_url=base_url,
+            )
+        except AIImageGenerationError as exc:
+            raise RuntimeError(f"{scene_index}번 장면 AI 이미지 생성 실패: {exc}") from exc
+        output_path.write_bytes(image_bytes)
+        generated_cfg["scenes"][scene_index - 1]["source"] = relative_path_text(
+            generated_config_path.parent,
+            output_path,
+        )
+        print(f"[AI 이미지 저장] scene={scene_index:02d} path={output_path}")
+
+    generated_config_path.write_text(
+        json.dumps(generated_cfg, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+    report_path = generated_config_path.with_name(f"{generated_config_path.stem}_prompts.json")
+    report_payload = {
+        "config": str(config_path),
+        "generated_config": str(generated_config_path),
+        "images_dir": str(images_dir),
+        "model": model_name,
+        "size": size,
+        "scene_count": len(prompt_items),
+        "scene_prompts": prompt_items,
+    }
+    report_path.write_text(json.dumps(report_payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(f"[AI 이미지 파생 설정 저장] {generated_config_path}")
+    print(f"[AI 이미지 프롬프트 리포트 저장] {report_path}")
 
 
 def find_font(bold: bool = True) -> str | None:
@@ -1180,6 +1417,13 @@ if __name__ == "__main__":
             args.batch_file,
             retry_failed=args.retry_failed,
             summary_report_path=args.summary_report,
+        )
+    elif args.generate_ai_images:
+        generate_ai_images(
+            config_path_override=args.config,
+            images_dir_override=args.generated_images_dir,
+            generated_config_override=args.generated_config_output,
+            model_override=args.image_model,
         )
     elif args.generate_image_prompts:
         generate_image_prompts(args.prompts_output, config_path_override=args.config)

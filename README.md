@@ -163,7 +163,82 @@ GitHub Actions에서도 동일하게 생성할 수 있습니다.
 2. `run_mode`를 `prompts`(또는 `both`)로 선택
 3. 완료 후 **Artifacts**에서 `scene-image-prompts` 다운로드
 
-## 7. 쇼츠 배치 생성 (여러 편 자동 제작)
+## 7. AI 이미지 생성 연동
+
+장면 프롬프트를 바로 AI 이미지로 생성해서 `config.json`에 연결된 새 설정 파일까지 만들 수 있습니다.
+
+현재 기본 연동은 **OpenAI 호환 이미지 생성 API** 기준입니다.
+
+### 7-1. 환경변수 설정
+
+API 키는 코드나 저장소에 넣지 말고 **환경변수**로만 설정하세요.
+
+```bash
+export OPENAI_API_KEY="YOUR_API_KEY"
+```
+
+선택적으로 OpenAI 호환 게이트웨이를 바꾸려면:
+
+```bash
+export OPENAI_IMAGE_BASE_URL="https://api.openai.com/v1"
+```
+
+### 7-2. 단일 config로 AI 이미지 생성
+
+```bash
+python main.py --config config.json --generate-ai-images
+```
+
+기본 생성 결과:
+
+```text
+output/generated_ai_images/scene_01.png
+output/generated_ai_images/scene_02.png
+...
+output/generated_ai_config.json
+output/generated_ai_config_prompts.json
+```
+
+- `generated_ai_images/`: 장면별 PNG
+- `generated_ai_config.json`: 생성된 이미지 경로를 `scenes[].source`에 반영한 파생 설정 파일
+- `generated_ai_config_prompts.json`: 어떤 프롬프트로 생성했는지 기록한 리포트
+
+옵션:
+
+```bash
+python main.py \
+  --config config.json \
+  --generate-ai-images \
+  --generated-images-dir output/my_ai_images \
+  --generated-config-output output/my_ai_config.json \
+  --image-model gpt-image-1
+```
+
+### 7-3. 생성된 이미지로 바로 렌더링
+
+AI 이미지 생성 후에는 파생 config를 그대로 렌더링하면 됩니다.
+
+```bash
+python main.py --config output/generated_ai_config.json
+```
+
+### 7-4. 동작 방식
+
+- 기존 `build_scene_prompt()` 로직을 재사용해 장면별 프롬프트를 만듭니다.
+- 영상 비율에 따라 이미지 크기를 자동 선택합니다.
+  - 세로형: `1024x1536`
+  - 가로형: `1536x1024`
+  - 정사각형: `1024x1024`
+- 생성된 PNG는 프로젝트 내부 디렉터리에만 저장됩니다.
+- 원본 `config.json`은 수정하지 않고, 파생 config만 새로 저장합니다.
+
+### 7-5. 주의사항
+
+- API 키를 Git에 커밋하지 마세요.
+- 생성 이미지와 파생 config는 결과물이므로 필요하면 `.gitignore`로 관리하세요.
+- 실제 호출 가능한 모델명은 사용 중인 OpenAI 호환 제공자 설정에 따라 다를 수 있습니다.
+
+## 8. 쇼츠 배치 생성 (여러 편 자동 제작)
 
 여러 개의 설정 파일을 한 번에 순차 렌더링할 수 있습니다. 기본 예시 파일은 프로젝트 루트의 `batch.json`입니다.
 
