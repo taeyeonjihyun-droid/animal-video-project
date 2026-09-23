@@ -254,8 +254,8 @@ def validate_video_config(cfg: dict, *, config_path: Path | None = None) -> None
         validate_scene_entry(scene, index=index)
 
 
-def print_batch_summary_lines(job_results: list[dict[str, Any]]) -> None:
-    print("[배치 작업 요약]")
+def print_batch_summary_lines(title: str, job_results: list[dict[str, Any]]) -> None:
+    print(title)
     for result in job_results:
         status_label = "성공" if result["status"] == "success" else "실패"
         output_path = result.get("output_path") or "-"
@@ -927,7 +927,7 @@ def build_batch_videos(
             print(f"[배치 출력] {final_output_value}")
             success_count += 1
     duration_seconds = time.perf_counter() - start_time
-    print_batch_summary_lines(job_results)
+    print_batch_summary_lines("[배치 작업 요약]", job_results)
     write_batch_summary_report(
         report_path=report_path,
         mode="batch-render",
@@ -1081,7 +1081,7 @@ def build_batch_image_prompts(
             print(f"[배치 프롬프트 출력] {final_output_value}")
             success_count += 1
     duration_seconds = time.perf_counter() - start_time
-    print_batch_summary_lines(job_results)
+    print_batch_summary_lines("[배치 프롬프트 작업 요약]", job_results)
     write_batch_summary_report(
         report_path=report_path,
         mode="batch-prompts",
