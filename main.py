@@ -250,8 +250,58 @@ def validate_video_config(cfg: dict, *, config_path: Path | None = None) -> None
         raise ValueError(f"{config_label}의 scenes는 장면 객체(dict) 목록(list)이어야 합니다.")
     if not scenes:
         raise ValueError(f"{config_label}의 scenes가 비어 있습니다. 최소 1개 장면이 필요합니다.")
-    for index, scene in enumerate(scenes, start=1):
+    for index, scene in enumerate(scenes):
         validate_scene_entry(scene, index=index)
+
+
+def rebase_repo_relative_path_value(
+    path_value: str,
+    *,
+    from_base_dir: Path,
+    to_base_dir: Path,
+) -> str:
+    resolved = resolve_repo_relative_path(
+        path_value,
+        base_dir=from_base_dir,
+        must_exist=False,
+    )
+    try:
+        return str(resolved.relative_to(to_base_dir))
+    except ValueError:
+        return str(resolved)
+
+
+def normalize_batch_overrides(
+    overrides: dict,
+    *,
+    batch_base_dir: Path,
+    config_base_dir: Path,
+) -> dict:
+    normalized = copy.deepcopy(overrides)
+
+    for key in ("output", "image_prompt_output", "bgm"):
+        value = normalized.get(key)
+        if isinstance(value, str) and value.strip():
+            normalized[key] = rebase_repo_relative_path_value(
+                value,
+                from_base_dir=batch_base_dir,
+                to_base_dir=config_base_dir,
+            )
+
+    scenes = normalized.get("scenes")
+    if isinstance(scenes, list):
+        for scene in scenes:
+            if not isinstance(scene, dict):
+                continue
+            source = scene.get("source")
+            if isinstance(source, str) and source.strip():
+                scene["source"] = rebase_repo_relative_path_value(
+                    source,
+                    from_base_dir=batch_base_dir,
+                    to_base_dir=config_base_dir,
+                )
+
+    return normalized
 
 
 def print_batch_summary_lines(title: str, job_results: list[dict[str, Any]]) -> None:
@@ -851,7 +901,12 @@ def build_batch_videos(
         if has_overrides and not isinstance(overrides, dict):
             raise ValueError(f"jobs[{index}].overrides는 객체(dict)여야 합니다.")
         if isinstance(overrides, dict) and overrides:
-            cfg = deep_merge_dict(cfg, overrides)
+            normalized_overrides = normalize_batch_overrides(
+                overrides,
+                batch_base_dir=batch_path.parent,
+                config_base_dir=config_path.parent,
+            )
+            cfg = deep_merge_dict(cfg, normalized_overrides)
             validate_video_config(cfg, config_path=config_path)
         base_output = validate_output_value(cfg, base_dir=config_path.parent)
         final_output_value = base_output
@@ -995,7 +1050,12 @@ def build_batch_image_prompts(
         if has_overrides and not isinstance(overrides, dict):
             raise ValueError(f"jobs[{index}].overrides는 객체(dict)여야 합니다.")
         if isinstance(overrides, dict) and overrides:
-            cfg = deep_merge_dict(cfg, overrides)
+            normalized_overrides = normalize_batch_overrides(
+                overrides,
+                batch_base_dir=batch_path.parent,
+                config_base_dir=config_path.parent,
+            )
+            cfg = deep_merge_dict(cfg, normalized_overrides)
             validate_video_config(cfg, config_path=config_path)
         base_output = validate_prompt_output_value(cfg, base_dir=config_path.parent)
         if filename_pattern:

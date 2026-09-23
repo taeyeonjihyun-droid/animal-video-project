@@ -317,6 +317,47 @@ class BatchFeatureTests(unittest.TestCase):
             batch_dir.resolve(),
         )
 
+    def test_batch_override_output_path_is_rebased_from_batch_file(self):
+        batch_dir = self.tmp_dir / "override-rebase"
+        config_dir = batch_dir / "configs"
+        cfg_path = config_dir / "episode.json"
+        batch_path = batch_dir / "batch.json"
+        self._write_json(
+            cfg_path,
+            {
+                "project_title": "테스트",
+                "subtitle": "테스트",
+                "video": {"width": 320, "height": 180, "fps": 12, "fade_seconds": 0.1},
+                "output": "output/test.mp4",
+                "scenes": [{"source": "assets/images/x.png", "caption": "x", "duration": 0.3, "zoom": 1.0}],
+            },
+        )
+        self._write_json(
+            batch_path,
+            {
+                "jobs": [
+                    {
+                        "config": "configs/episode.json",
+                        "overrides": {"output": "output/from-batch.mp4"},
+                    }
+                ]
+            },
+        )
+
+        rel_batch_path = batch_path.relative_to(main.ROOT).as_posix()
+        with patch("main.build_video_from_config") as mocked_build:
+            main.build_batch_videos(rel_batch_path)
+
+        rendered_cfg = mocked_build.call_args.args[0]
+        self.assertEqual(
+            Path(rendered_cfg["output"]),
+            (batch_dir / "output" / "from-batch.mp4").resolve(),
+        )
+        self.assertEqual(
+            mocked_build.call_args.kwargs["output_path"],
+            (batch_dir / "output" / "from-batch.mp4").resolve(),
+        )
+
     def test_batch_prompt_generation_calls_each_job_with_unique_outputs(self):
         batch_dir = self.tmp_dir / "batch-prompts"
         cfg_path = batch_dir / "episode.json"

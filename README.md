@@ -208,6 +208,7 @@ GitHub Actions에서도 동일하게 생성할 수 있습니다.
 
 - `jobs[].config`: **배치 파일 위치 기준 상대 경로** 또는 저장소 내부 절대 경로
 - `jobs[].overrides`: 원본 설정 일부를 job별로 덮어쓰기
+- `jobs[].overrides` 안의 경로형 값(`output`, `image_prompt_output`, `bgm`, `scenes[].source`)은 **배치 파일 위치 기준 상대 경로**로 써도 자동 보정됩니다.
 - `prompt_filename_pattern`: `batch-prompts` 모드에서 프롬프트 파일명 규칙 지정  
   사용 가능 변수: `{index}`, `{index2}`, `{job}`, `{job_slug}`, `{config}`, `{stem}`
 
