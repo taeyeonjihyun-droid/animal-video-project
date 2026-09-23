@@ -18,7 +18,6 @@ from moviepy import (
     CompositeVideoClip,
     AudioFileClip,
     CompositeAudioClip,
-    concatenate_videoclips,
     vfx,
     afx,
 )
@@ -119,6 +118,68 @@ def validate_prompt_output_value(cfg: dict, *, base_dir: Path) -> Path:
     if output_path.suffix.lower() != ".json":
         raise ValueError("image_prompt_output 파일 확장자는 .json이어야 합니다.")
     return output_path
+
+
+def validate_media_path_value(
+    path_value: str,
+    *,
+    base_dir: Path,
+    field_name: str,
+) -> Path:
+    if not isinstance(path_value, str) or not path_value.strip():
+        raise ValueError(f"{field_name}은 비어 있지 않은 문자열 경로여야 합니다.")
+    return resolve_repo_relative_path(
+        path_value,
+        base_dir=base_dir,
+        must_exist=True,
+    )
+
+
+def validate_render_media_paths(
+    cfg: dict,
+    *,
+    base_dir: Path,
+) -> dict[str, Any]:
+    output_path = validate_output_value(cfg, base_dir=base_dir)
+    bgm_value = cfg.get("bgm", "")
+    bgm_path = None
+    if isinstance(bgm_value, str) and bgm_value.strip():
+        bgm_path = validate_media_path_value(
+            bgm_value,
+            base_dir=base_dir,
+            field_name="bgm",
+        )
+
+    scenes = cfg.get("scenes")
+    if not isinstance(scenes, list) or not scenes:
+        raise ValueError("scenes에는 1개 이상의 장면이 필요합니다.")
+
+    scene_sources: list[Path] = []
+    for index, scene in enumerate(scenes, start=1):
+        if not isinstance(scene, dict):
+            raise ValueError(f"scenes[{index}]는 객체(dict)여야 합니다.")
+        source_value = scene.get("source")
+        source_path = validate_media_path_value(
+            source_value,
+            base_dir=base_dir,
+            field_name=f"scenes[{index}].source",
+        )
+        start_value = scene.get("start")
+        is_video_source = source_path.suffix.lower() in {".mp4", ".mov", ".mkv", ".webm", ".m4v"}
+        if "start" in scene:
+            if not is_video_source:
+                raise ValueError(f"scenes[{index}].start는 비디오 장면에서만 사용할 수 있습니다.")
+            if isinstance(start_value, bool) or not isinstance(start_value, (int, float)):
+                raise ValueError(f"scenes[{index}].start는 숫자여야 합니다.")
+            if float(start_value) < 0:
+                raise ValueError(f"scenes[{index}].start는 0 이상이어야 합니다.")
+        scene_sources.append(source_path)
+
+    return {
+        "output": output_path,
+        "bgm": bgm_path,
+        "scene_sources": scene_sources,
+    }
 
 
 def slugify_filename_token(value: str) -> str:
@@ -579,11 +640,19 @@ def make_video_scene(
     caption: str,
     size: Tuple[int, int],
     fade_seconds: float,
+    start_time: float = 0.0,
 ):
-    clip = VideoFileClip(str(path))
-    if clip.duration >= duration:
-        clip = clip.subclipped(0, duration)
-    else:
+    source_clip = VideoFileClip(str(path))
+    if start_time < 0:
+        raise ValueError("비디오 장면 start 값은 0 이상이어야 합니다.")
+    if start_time >= source_clip.duration:
+        raise ValueError(
+            f"비디오 장면 start 값({start_time})이 원본 길이({source_clip.duration:.2f})보다 크거나 같습니다: {path}"
+        )
+
+    clip_end = min(source_clip.duration, start_time + duration)
+    clip = source_clip.subclipped(start_time, clip_end)
+    if clip.duration < duration:
         clip = clip.with_effects([vfx.Loop(duration=duration)])
 
     w, h = clip.size
@@ -600,7 +669,7 @@ def make_video_scene(
             vfx.FadeIn(min(fade_seconds, duration/3)),
             vfx.FadeOut(min(fade_seconds, duration/3)),
         ])
-    return clip
+    return clip, source_clip
 
 
 def build_video():
@@ -618,21 +687,49 @@ def build_video_from_config(
     size = (int(vcfg["width"]), int(vcfg["height"]))
     fps = int(vcfg.get("fps", 30))
     fade_seconds = float(vcfg.get("fade_seconds", 0.35))
+    crossfade_seconds = max(0.0, float(vcfg.get("crossfade_seconds", fade_seconds)))
+    resolved_paths = validate_render_media_paths(cfg, base_dir=output_base_dir)
 
     clips = []
+    clip_crossfades: list[float] = []
+    source_video_clips: list[VideoFileClip] = []
     for i, scene in enumerate(cfg["scenes"], start=1):
-        source = ROOT / scene["source"]
+        source = resolved_paths["scene_sources"][i - 1]
         duration = float(scene.get("duration", 7.5))
         caption = scene.get("caption", "")
         zoom = float(scene.get("zoom", 1.04))
+        is_video_source = source.suffix.lower() in {".mp4", ".mov", ".mkv", ".webm", ".m4v"}
+        start_time = float(scene.get("start", 0.0)) if is_video_source else 0.0
+        effective_crossfade = (
+            0.0
+            if not clips
+            else min(crossfade_seconds, duration / 2, clips[-1].duration / 2)
+        )
 
-        if source.suffix.lower() in {".mp4", ".mov", ".mkv", ".webm", ".m4v"} and source.exists():
-            clip = make_video_scene(source, duration, caption, size, fade_seconds)
+        if is_video_source:
+            clip, source_video_clip = make_video_scene(source, duration, caption, size, fade_seconds, start_time)
+            source_video_clips.append(source_video_clip)
         else:
             clip = make_image_scene(source, duration, caption, zoom, size, i, fade_seconds)
+        if effective_crossfade > 0:
+            clip = clip.with_effects([vfx.CrossFadeIn(effective_crossfade)])
         clips.append(clip)
+        clip_crossfades.append(effective_crossfade)
 
-    final = concatenate_videoclips(clips, method="compose")
+    timeline: list[Any] = []
+    current_end = 0.0
+    for index, clip in enumerate(clips):
+        if index == 0:
+            start_at = 0.0
+        else:
+            start_at = max(0.0, current_end - clip_crossfades[index])
+        clip_with_start = clip.with_start(start_at)
+        timeline.append(clip_with_start)
+        current_end = max(current_end, clip_with_start.end or (start_at + clip.duration))
+
+    final = CompositeVideoClip(timeline, size=size).with_duration(current_end)
+    title = None
+    bgm = None
 
     # 첫 장면 상단 타이틀
     title_duration = min(4.5, final.duration)
@@ -643,21 +740,21 @@ def build_video_from_config(
     final = CompositeVideoClip([final, title], size=size).with_duration(final.duration)
 
     # BGM이 있으면 전체 길이에 맞춰 반복 후 믹싱
-    bgm_path = ROOT / cfg.get("bgm", "")
-    if bgm_path.exists():
+    bgm_path = resolved_paths["bgm"]
+    if bgm_path is not None:
         bgm = AudioFileClip(str(bgm_path))
         bgm = bgm.with_effects([
             afx.AudioLoop(duration=final.duration),
-            afx.MultiplyVolume(float(vcfg.get("bgm_volume", 0.16))),
+            afx.MultiplyVolume(float(vcfg.get("bgm_volume", 0.14))),
             afx.AudioFadeIn(1.0),
-            afx.AudioFadeOut(1.5),
+            afx.AudioFadeOut(min(3.0, max(2.0, final.duration * 0.08))),
         ])
         if final.audio is not None:
             final = final.with_audio(CompositeAudioClip([final.audio, bgm]))
         else:
             final = final.with_audio(bgm)
     else:
-        print(f"[안내] BGM 없음: {bgm_path}. 무음 영상으로 생성합니다.")
+        print("[안내] BGM 설정이 없어 원본 오디오만으로 생성합니다.")
 
     if output_path is not None:
         out = resolve_repo_relative_path(
@@ -666,21 +763,32 @@ def build_video_from_config(
             must_exist=False,
         )
     else:
-        out = validate_output_value(cfg, base_dir=output_base_dir)
+        out = resolved_paths["output"]
     if out.suffix.lower() != ".mp4":
         raise ValueError("output 파일 확장자는 .mp4여야 합니다.")
     out.parent.mkdir(parents=True, exist_ok=True)
     print(f"[렌더링 시작] {out}")
-    final.write_videofile(
-        str(out),
-        fps=fps,
-        codec="libx264",
-        audio_codec="aac",
-        preset="medium",
-        threads=4,
-        ffmpeg_params=["-pix_fmt", "yuv420p", "-movflags", "+faststart"],
-    )
-    print(f"[완료] {out}")
+    try:
+        final.write_videofile(
+            str(out),
+            fps=fps,
+            codec="libx264",
+            audio_codec="aac",
+            preset="medium",
+            threads=4,
+            ffmpeg_params=["-pix_fmt", "yuv420p", "-movflags", "+faststart"],
+        )
+        print(f"[완료] {out}")
+    finally:
+        if bgm is not None:
+            bgm.close()
+        if title is not None:
+            title.close()
+        final.close()
+        for clip in clips:
+            clip.close()
+        for source_video_clip in source_video_clips:
+            source_video_clip.close()
 
 
 def build_batch_videos(
