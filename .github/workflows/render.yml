@@ -61,14 +61,14 @@ jobs:
         run: |
           echo "렌더링 결과 확인"
           ls -lah output
-          test -f output/busan_shark_trip.mp4
+          test -f output/busan_shark_trip_final.mp4
 
       - name: Upload rendered video
         if: ${{ github.event.inputs.run_mode == 'render' || github.event.inputs.run_mode == 'both' }}
         uses: actions/upload-artifact@v4
         with:
-          name: busan-shark-trip-video
-          path: output/busan_shark_trip.mp4
+          name: busan-shark-trip-final-video
+          path: output/busan_shark_trip_final.mp4
           if-no-files-found: error
           retention-days: 7
 

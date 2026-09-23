@@ -1,64 +1,57 @@
 {
-  "project_title": "부산으로 떠난 동물 친구들의 상어 여행",
-  "subtitle": "강아지 · 고양이 · 자이언트 판다 · 레서판다 · 원숭이의 부산 여행",
+  "project_title": "부산으로 떠난 동물 친구들과 상어 여행",
+  "subtitle": "Busan shark trip final render with source footage, image moments and soft BGM",
   "video": {
     "width": 1280,
     "height": 720,
     "fps": 30,
     "fade_seconds": 0.4,
-    "bgm_volume": 0.14
+    "crossfade_seconds": 0.4,
+    "bgm_volume": 0.12
   },
   "bgm": "assets/audio/bgm.mp3",
-  "output": "output/busan_shark_trip.mp4",
+  "output": "output/busan_shark_trip_final.mp4",
   "image_prompt_output": "output/scene_image_prompts.json",
   "scenes": [
     {
-      "source": "assets/images/train_station_gathering.png",
-      "caption": "다섯 동물 친구들이 여행가방을 들고 기차역에서 부산 여행을 준비해요!",
-      "duration": 7.5,
-      "zoom": 1.04
+      "source": "assets/video/busan_shark_trip_source.mp4",
+      "caption": "동물 친구들이 부산 바다 여행을 시작해요!",
+      "start": 0.0,
+      "duration": 3.8,
+      "zoom": 1.0
     },
     {
-      "source": "assets/images/boarding_train.png",
-      "caption": "다섯 친구가 함께 부산행 기차에 올라타요!",
-      "duration": 7.5,
+      "source": "assets/images/animal_friends.png",
+      "caption": "부산에 도착한 동물 친구들이 설레는 마음으로 함께 모였어요!",
+      "duration": 4.6,
+      "zoom": 1.07
+    },
+    {
+      "source": "assets/video/busan_shark_trip_source.mp4",
+      "caption": "부산 풍경을 따라 신나게 이동하며 여행 분위기를 즐겨요!",
+      "start": 3.4,
+      "duration": 8.0,
+      "zoom": 1.0
+    },
+    {
+      "source": "assets/video/busan_shark_trip_source.mp4",
+      "caption": "드넓은 물가에서 상어가 나타나길 기다려요!",
+      "start": 11.4,
+      "duration": 4.8,
+      "zoom": 1.0
+    },
+    {
+      "source": "assets/images/busan_shark.png",
+      "caption": "마침내 부산 바다에서 상어를 또렷하게 발견했어요!",
+      "duration": 5.4,
       "zoom": 1.05
     },
     {
-      "source": "assets/images/train_window_scenery.png",
-      "caption": "기차 안에서 창밖 풍경을 보며 부산으로 향해요!",
-      "duration": 7.5,
-      "zoom": 1.04
-    },
-    {
-      "source": "assets/images/busan_arrival.png",
-      "caption": "드디어 부산에 도착했어요!",
-      "duration": 7.5,
-      "zoom": 1.05
-    },
-    {
-      "source": "assets/images/waterfront_walk.png",
-      "caption": "부산 바닷가를 걸으며 아름다운 풍경을 구경해요!",
-      "duration": 7.5,
-      "zoom": 1.04
-    },
-    {
-      "source": "assets/images/waiting_for_shark.png",
-      "caption": "친구들이 물가에서 상어를 기다려요!",
-      "duration": 7.5,
-      "zoom": 1.05
-    },
-    {
-      "source": "assets/images/shark_watching.png",
-      "caption": "멋진 상어가 헤엄치는 모습을 모두 함께 바라봐요!",
-      "duration": 7.5,
-      "zoom": 1.04
-    },
-    {
-      "source": "assets/images/happy_ending_group.png",
-      "caption": "즐거운 부산 여행을 마치며 모두 행복하게 인사해요!",
-      "duration": 7.5,
-      "zoom": 1.03
+      "source": "assets/video/busan_shark_trip_source.mp4",
+      "caption": "상어를 본 뒤에도 부산 여행의 여운을 즐기며 마무리해요!",
+      "start": 18.2,
+      "duration": 8.6,
+      "zoom": 1.0
     }
   ]
 }

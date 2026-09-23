@@ -606,6 +606,53 @@ class BatchFeatureTests(unittest.TestCase):
             },
         )
 
+    def test_validate_render_media_paths_resolves_existing_paths(self):
+        render_dir = self.tmp_dir / "render-assets"
+        clip_path = render_dir / "assets" / "clips" / "scene.mp4"
+        image_path = render_dir / "assets" / "images" / "scene.png"
+        bgm_path = render_dir / "assets" / "audio" / "bgm.mp3"
+        clip_path.parent.mkdir(parents=True, exist_ok=True)
+        image_path.parent.mkdir(parents=True, exist_ok=True)
+        bgm_path.parent.mkdir(parents=True, exist_ok=True)
+        clip_path.write_bytes(b"mp4")
+        image_path.write_bytes(b"png")
+        bgm_path.write_bytes(b"mp3")
+
+        cfg = {
+            "output": "output/final.mp4",
+            "bgm": "assets/audio/bgm.mp3",
+            "scenes": [
+                {"source": "assets/clips/scene.mp4", "duration": 1.0},
+                {"source": "assets/images/scene.png", "duration": 1.0},
+            ],
+        }
+
+        resolved = main.validate_render_media_paths(cfg, base_dir=render_dir)
+
+        self.assertEqual(resolved["output"], (render_dir / "output" / "final.mp4").resolve())
+        self.assertEqual(resolved["bgm"], bgm_path.resolve())
+        self.assertEqual(
+            resolved["scene_sources"],
+            [clip_path.resolve(), image_path.resolve()],
+        )
+
+    def test_validate_render_media_paths_rejects_missing_scene_source(self):
+        render_dir = self.tmp_dir / "render-assets-missing"
+        bgm_path = render_dir / "assets" / "audio" / "bgm.mp3"
+        bgm_path.parent.mkdir(parents=True, exist_ok=True)
+        bgm_path.write_bytes(b"mp3")
+
+        cfg = {
+            "output": "output/final.mp4",
+            "bgm": "assets/audio/bgm.mp3",
+            "scenes": [
+                {"source": "assets/images/missing.png", "duration": 1.0},
+            ],
+        }
+
+        with self.assertRaises(ValueError):
+            main.validate_render_media_paths(cfg, base_dir=render_dir)
+
 
 if __name__ == "__main__":
     unittest.main()
