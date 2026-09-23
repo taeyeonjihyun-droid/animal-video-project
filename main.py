@@ -642,16 +642,16 @@ def make_video_scene(
     fade_seconds: float,
     start_time: float = 0.0,
 ):
-    clip = VideoFileClip(str(path))
+    source_clip = VideoFileClip(str(path))
     if start_time < 0:
         raise ValueError("비디오 장면 start 값은 0 이상이어야 합니다.")
-    if start_time >= clip.duration:
+    if start_time >= source_clip.duration:
         raise ValueError(
-            f"비디오 장면 start 값({start_time})이 원본 길이({clip.duration:.2f})보다 크거나 같습니다: {path}"
+            f"비디오 장면 start 값({start_time})이 원본 길이({source_clip.duration:.2f})보다 크거나 같습니다: {path}"
         )
 
-    clip_end = min(clip.duration, start_time + duration)
-    clip = clip.subclipped(start_time, clip_end)
+    clip_end = min(source_clip.duration, start_time + duration)
+    clip = source_clip.subclipped(start_time, clip_end)
     if clip.duration < duration:
         clip = clip.with_effects([vfx.Loop(duration=duration)])
 
@@ -669,7 +669,7 @@ def make_video_scene(
             vfx.FadeIn(min(fade_seconds, duration/3)),
             vfx.FadeOut(min(fade_seconds, duration/3)),
         ])
-    return clip
+    return clip, source_clip
 
 
 def build_video():
@@ -692,6 +692,7 @@ def build_video_from_config(
 
     clips = []
     clip_crossfades: list[float] = []
+    source_video_clips: list[VideoFileClip] = []
     for i, scene in enumerate(cfg["scenes"], start=1):
         source = resolved_paths["scene_sources"][i - 1]
         duration = float(scene.get("duration", 7.5))
@@ -705,8 +706,9 @@ def build_video_from_config(
             else min(crossfade_seconds, duration / 2, clips[-1].duration / 2)
         )
 
-        if is_video_source and source.exists():
-            clip = make_video_scene(source, duration, caption, size, fade_seconds, start_time)
+        if is_video_source:
+            clip, source_video_clip = make_video_scene(source, duration, caption, size, fade_seconds, start_time)
+            source_video_clips.append(source_video_clip)
         else:
             clip = make_image_scene(source, duration, caption, zoom, size, i, fade_seconds)
         if effective_crossfade > 0:
@@ -785,6 +787,8 @@ def build_video_from_config(
         final.close()
         for clip in clips:
             clip.close()
+        for source_video_clip in source_video_clips:
+            source_video_clip.close()
 
 
 def build_batch_videos(
