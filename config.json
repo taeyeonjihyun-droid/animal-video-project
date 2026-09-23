@@ -1,30 +1,64 @@
-Open the repository taeyeonjihyun-droid/animal-video-project.
-
-Create a new branch named busan-shark-trip.
-
-Replace config.json with a new story about five cute animal friends — a dog, cat, giant panda, red panda, and monkey — traveling by train to Busan to see a famous shark. Use 8 scenes, 1280x720, 30 fps, and output file output/busan_shark_trip.mp4.
-
-Scene filenames:
-- assets/images/train_station_gathering.png
-- assets/images/boarding_train.png
-- assets/images/train_window_scenery.png
-- assets/images/busan_arrival.png
-- assets/images/waterfront_walk.png
-- assets/images/waiting_for_shark.png
-- assets/images/shark_watching.png
-- assets/images/happy_ending_group.png
-
-Scene captions should describe:
-1) gathering at the train station
-2) boarding the train
-3) enjoying scenery on the train
-4) arriving in Busan
-5) walking along the waterfront
-6) waiting to see the shark
-7) watching a majestic shark swimming
-8) warm happy ending by the sea
-
-Also replace .github/workflows/render.yml with a clean working workflow_dispatch GitHub Actions workflow that supports run_mode values render, prompts, and both; installs ffmpeg and fonts-nanum; installs Python requirements; runs python main.py or python main.py --generate-image-prompts --prompts-output output/scene_image_prompts.json; verifies output/busan_shark_trip.mp4 for render; and uploads artifacts for the video and prompts.
-
-Commit the changes and open a pull request titled:
-"Add Busan shark trip animal story"
+{
+  "project_title": "부산으로 떠난 동물 친구들의 상어 여행",
+  "subtitle": "강아지 · 고양이 · 자이언트 판다 · 레서판다 · 원숭이의 부산 여행",
+  "video": {
+    "width": 1280,
+    "height": 720,
+    "fps": 30,
+    "fade_seconds": 0.4,
+    "bgm_volume": 0.14
+  },
+  "bgm": "assets/audio/bgm.mp3",
+  "output": "output/busan_shark_trip.mp4",
+  "image_prompt_output": "output/scene_image_prompts.json",
+  "scenes": [
+    {
+      "source": "assets/images/train_station_gathering.png",
+      "caption": "다섯 동물 친구들이 여행가방을 들고 기차역에서 부산 여행을 준비해요!",
+      "duration": 7.5,
+      "zoom": 1.04
+    },
+    {
+      "source": "assets/images/boarding_train.png",
+      "caption": "다섯 친구가 함께 부산행 기차에 올라타요!",
+      "duration": 7.5,
+      "zoom": 1.05
+    },
+    {
+      "source": "assets/images/train_window_scenery.png",
+      "caption": "기차 안에서 창밖 풍경을 보며 부산으로 향해요!",
+      "duration": 7.5,
+      "zoom": 1.04
+    },
+    {
+      "source": "assets/images/busan_arrival.png",
+      "caption": "드디어 부산에 도착했어요!",
+      "duration": 7.5,
+      "zoom": 1.05
+    },
+    {
+      "source": "assets/images/waterfront_walk.png",
+      "caption": "부산 바닷가를 걸으며 아름다운 풍경을 구경해요!",
+      "duration": 7.5,
+      "zoom": 1.04
+    },
+    {
+      "source": "assets/images/waiting_for_shark.png",
+      "caption": "친구들이 물가에서 상어를 기다려요!",
+      "duration": 7.5,
+      "zoom": 1.05
+    },
+    {
+      "source": "assets/images/shark_watching.png",
+      "caption": "멋진 상어가 헤엄치는 모습을 모두 함께 바라봐요!",
+      "duration": 7.5,
+      "zoom": 1.04
+    },
+    {
+      "source": "assets/images/happy_ending_group.png",
+      "caption": "즐거운 부산 여행을 마치며 모두 행복하게 인사해요!",
+      "duration": 7.5,
+      "zoom": 1.03
+    }
+  ]
+}
