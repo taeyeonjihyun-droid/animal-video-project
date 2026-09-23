@@ -164,8 +164,15 @@ def validate_render_media_paths(
             base_dir=base_dir,
             field_name=f"scenes[{index}].source",
         )
-        if source_path.suffix.lower() not in {".mp4", ".mov", ".mkv", ".webm", ".m4v"} and "start" in scene:
-            raise ValueError(f"scenes[{index}].start는 비디오 장면에서만 사용할 수 있습니다.")
+        start_value = scene.get("start")
+        is_video_source = source_path.suffix.lower() in {".mp4", ".mov", ".mkv", ".webm", ".m4v"}
+        if "start" in scene:
+            if not is_video_source:
+                raise ValueError(f"scenes[{index}].start는 비디오 장면에서만 사용할 수 있습니다.")
+            if isinstance(start_value, bool) or not isinstance(start_value, (int, float)):
+                raise ValueError(f"scenes[{index}].start는 숫자여야 합니다.")
+            if float(start_value) < 0:
+                raise ValueError(f"scenes[{index}].start는 0 이상이어야 합니다.")
         scene_sources.append(source_path)
 
     return {
@@ -690,10 +697,15 @@ def build_video_from_config(
         duration = float(scene.get("duration", 7.5))
         caption = scene.get("caption", "")
         zoom = float(scene.get("zoom", 1.04))
-        start_time = float(scene.get("start", 0.0))
-        effective_crossfade = 0.0 if not clips else min(crossfade_seconds, duration / 2)
+        is_video_source = source.suffix.lower() in {".mp4", ".mov", ".mkv", ".webm", ".m4v"}
+        start_time = float(scene.get("start", 0.0)) if is_video_source else 0.0
+        effective_crossfade = (
+            0.0
+            if not clips
+            else min(crossfade_seconds, duration / 2, clips[-1].duration / 2)
+        )
 
-        if source.suffix.lower() in {".mp4", ".mov", ".mkv", ".webm", ".m4v"} and source.exists():
+        if is_video_source and source.exists():
             clip = make_video_scene(source, duration, caption, size, fade_seconds, start_time)
         else:
             clip = make_image_scene(source, duration, caption, zoom, size, i, fade_seconds)
@@ -713,6 +725,8 @@ def build_video_from_config(
         current_start = start_at + clip.duration
 
     final = CompositeVideoClip(timeline, size=size).with_duration(current_start)
+    title = None
+    bgm = None
 
     # 첫 장면 상단 타이틀
     title_duration = min(4.5, final.duration)
@@ -751,16 +765,25 @@ def build_video_from_config(
         raise ValueError("output 파일 확장자는 .mp4여야 합니다.")
     out.parent.mkdir(parents=True, exist_ok=True)
     print(f"[렌더링 시작] {out}")
-    final.write_videofile(
-        str(out),
-        fps=fps,
-        codec="libx264",
-        audio_codec="aac",
-        preset="medium",
-        threads=4,
-        ffmpeg_params=["-pix_fmt", "yuv420p", "-movflags", "+faststart"],
-    )
-    print(f"[완료] {out}")
+    try:
+        final.write_videofile(
+            str(out),
+            fps=fps,
+            codec="libx264",
+            audio_codec="aac",
+            preset="medium",
+            threads=4,
+            ffmpeg_params=["-pix_fmt", "yuv420p", "-movflags", "+faststart"],
+        )
+        print(f"[완료] {out}")
+    finally:
+        if bgm is not None:
+            bgm.close()
+        if title is not None:
+            title.close()
+        final.close()
+        for clip in clips:
+            clip.close()
 
 
 def build_batch_videos(
