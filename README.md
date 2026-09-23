@@ -181,6 +181,7 @@ OpenAI가 아닌 호환 게이트웨이를 쓰는 경우에는 다음처럼 중�
 
 ```bash
 export AI_IMAGE_API_KEY="YOUR_API_KEY"
+export AI_IMAGE_BASE_URL="https://your-provider.example/v1"
 ```
 
 선택적으로 OpenAI 호환 게이트웨이를 바꾸려면:

@@ -86,6 +86,24 @@ jobs:
         if: ${{ env.RUN_MODE == 'render' || env.RUN_MODE == 'both' }}
         run: python main.py
 
+      - name: Generate batch prompts
+        id: batch_prompts
+        if: ${{ env.RUN_MODE == 'batch-prompts' || env.RUN_MODE == 'batch-both' }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          summary_args=()
+          if [ "${{ github.event.inputs.batch_summary_report || 'true' }}" = "true" ]; then
+            summary_args+=(--summary-report output/batch_prompts_summary.json)
+          fi
+          python main.py \
+            --batch-generate-image-prompts \
+            --batch-file "${{ github.event.inputs.batch_file }}" \
+            --retry-failed "${{ github.event.inputs.batch_retry_count || '0' }}" \
+            "${summary_args[@]}" \
+            2>&1 | tee output/batch_prompts.log
+
       - name: Render batch videos
         id: batch_render
         if: ${{ env.RUN_MODE == 'batch' || env.RUN_MODE == 'batch-both' }}
@@ -103,24 +121,6 @@ jobs:
             --retry-failed "${{ github.event.inputs.batch_retry_count || '0' }}" \
             "${summary_args[@]}" \
             2>&1 | tee output/batch_render.log
-
-      - name: Generate batch prompts
-        id: batch_prompts
-        if: ${{ always() && ((env.RUN_MODE == 'batch-prompts') || (env.RUN_MODE == 'batch-both' && (steps.batch_render.outcome == 'success' || steps.batch_render.outcome == 'failure'))) }}
-        continue-on-error: true
-        shell: bash
-        run: |
-          set -o pipefail
-          summary_args=()
-          if [ "${{ github.event.inputs.batch_summary_report || 'true' }}" = "true" ]; then
-            summary_args+=(--summary-report output/batch_prompts_summary.json)
-          fi
-          python main.py \
-            --batch-generate-image-prompts \
-            --batch-file "${{ github.event.inputs.batch_file }}" \
-            --retry-failed "${{ github.event.inputs.batch_retry_count || '0' }}" \
-            "${summary_args[@]}" \
-            2>&1 | tee output/batch_prompts.log
 
       - name: Summarize batch failure reason
         if: ${{ (env.RUN_MODE == 'batch' || env.RUN_MODE == 'batch-both') && steps.batch_render.outcome == 'failure' }}
