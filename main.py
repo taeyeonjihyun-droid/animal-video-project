@@ -715,16 +715,17 @@ def build_video_from_config(
         clip_crossfades.append(effective_crossfade)
 
     timeline: list[Any] = []
-    current_start = 0.0
+    current_end = 0.0
     for index, clip in enumerate(clips):
         if index == 0:
             start_at = 0.0
         else:
-            start_at = max(0.0, current_start - clip_crossfades[index])
-        timeline.append(clip.with_start(start_at))
-        current_start = start_at + clip.duration
+            start_at = max(0.0, current_end - clip_crossfades[index])
+        clip_with_start = clip.with_start(start_at)
+        timeline.append(clip_with_start)
+        current_end = max(current_end, clip_with_start.end or (start_at + clip.duration))
 
-    final = CompositeVideoClip(timeline, size=size).with_duration(current_start)
+    final = CompositeVideoClip(timeline, size=size).with_duration(current_end)
     title = None
     bgm = None
 
