@@ -1,63 +1,30 @@
-{
-  "project_title": "동물 친구들의 바닷가 보물찾기",
-  "subtitle": "강아지 · 고양이 · 팬더 · 토끼의 신나는 바다 모험",
-  "video": {
-    "width": 1280,
-    "height": 720,
-    "fps": 30,
-    "fade_seconds": 0.35,
-    "bgm_volume": 0.16
-  },
-  "bgm": "assets/audio/bgm.mp3",
-  "output": "output/animal_trip.mp4",
-  "scenes": [
-    {
-      "source": "assets/images/beach_arrival.png",
-      "caption": "와! 드디어 바닷가에 도착했어요!",
-      "duration": 7.5,
-      "zoom": 1.04
-    },
-    {
-      "source": "assets/images/map_discovery.png",
-      "caption": "모래사장에서 신비한 보물지도를 찾았어요!",
-      "duration": 7.5,
-      "zoom": 1.05
-    },
-    {
-      "source": "assets/images/treasure_hunt_start.png",
-      "caption": "네 친구가 보물지도를 따라 출발해요!",
-      "duration": 7.5,
-      "zoom": 1.04
-    },
-    {
-      "source": "assets/images/shell_collecting.png",
-      "caption": "예쁜 조개와 반짝이는 돌도 찾았어요!",
-      "duration": 7.5,
-      "zoom": 1.05
-    },
-    {
-      "source": "assets/images/cave_found.png",
-      "caption": "지도 끝에서 작은 동굴을 발견했어요!",
-      "duration": 7.5,
-      "zoom": 1.04
-    },
-    {
-      "source": "assets/images/treasure_box.png",
-      "caption": "드디어 모래 속 보물상자를 찾았어요!",
-      "duration": 7.5,
-      "zoom": 1.05
-    },
-    {
-      "source": "assets/images/sunset_treasure.png",
-      "caption": "노을 아래서 보물을 함께 열어봤어요!",
-      "duration": 7.5,
-      "zoom": 1.04
-    },
-    {
-      "source": "assets/images/beach_goodbye.png",
-      "caption": "즐거운 바닷가 보물찾기, 다음에 또 만나요!",
-      "duration": 7.5,
-      "zoom": 1.03
-    }
-  ]
-}
+Open the repository taeyeonjihyun-droid/animal-video-project.
+
+Create a new branch named busan-shark-trip.
+
+Replace config.json with a new story about five cute animal friends — a dog, cat, giant panda, red panda, and monkey — traveling by train to Busan to see a famous shark. Use 8 scenes, 1280x720, 30 fps, and output file output/busan_shark_trip.mp4.
+
+Scene filenames:
+- assets/images/train_station_gathering.png
+- assets/images/boarding_train.png
+- assets/images/train_window_scenery.png
+- assets/images/busan_arrival.png
+- assets/images/waterfront_walk.png
+- assets/images/waiting_for_shark.png
+- assets/images/shark_watching.png
+- assets/images/happy_ending_group.png
+
+Scene captions should describe:
+1) gathering at the train station
+2) boarding the train
+3) enjoying scenery on the train
+4) arriving in Busan
+5) walking along the waterfront
+6) waiting to see the shark
+7) watching a majestic shark swimming
+8) warm happy ending by the sea
+
+Also replace .github/workflows/render.yml with a clean working workflow_dispatch GitHub Actions workflow that supports run_mode values render, prompts, and both; installs ffmpeg and fonts-nanum; installs Python requirements; runs python main.py or python main.py --generate-image-prompts --prompts-output output/scene_image_prompts.json; verifies output/busan_shark_trip.mp4 for render; and uploads artifacts for the video and prompts.
+
+Commit the changes and open a pull request titled:
+"Add Busan shark trip animal story"
