@@ -236,12 +236,23 @@ def resolve_summary_report_path(path_value: str, *, base_dir: Path) -> Path:
     return report_path
 
 
-def validate_scene_entry(scene: Any, *, index: int) -> None:
+def validate_scene_entry(scene: Any, *, index: int, config_base_dir: Path | None = None) -> None:
     if not isinstance(scene, dict):
         raise ValueError(f"scenes[{index}]는 객체(dict)여야 합니다.")
     source = scene.get("source")
     if not isinstance(source, str) or not source.strip():
         raise ValueError(f"scenes[{index}].source는 비어 있지 않은 문자열이어야 합니다.")
+    if config_base_dir is not None:
+        resolved_source = resolve_repo_relative_path(
+            source,
+            base_dir=config_base_dir,
+            must_exist=False,
+        )
+        if (
+            resolved_source.suffix.lower() in {".mp4", ".mov", ".mkv", ".webm", ".m4v"}
+            and not resolved_source.exists()
+        ):
+            raise ValueError(f"scenes[{index}].source 비디오 파일을 찾을 수 없습니다: {source}")
     caption = scene.get("caption", "")
     if not isinstance(caption, str):
         raise ValueError(f"scenes[{index}].caption은 문자열이어야 합니다.")
@@ -294,7 +305,11 @@ def validate_video_config(cfg: dict, *, config_path: Path | None = None) -> None
     if not scenes:
         raise ValueError(f"{config_label}의 scenes가 비어 있습니다. 최소 1개 장면이 필요합니다.")
     for index, scene in enumerate(scenes):
-        validate_scene_entry(scene, index=index)
+        validate_scene_entry(
+            scene,
+            index=index,
+            config_base_dir=config_path.parent if config_path is not None else ROOT,
+        )
 
 
 def resolve_path_value_for_base(

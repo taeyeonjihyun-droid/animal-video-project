@@ -217,6 +217,7 @@ jobs:
         shell: bash
         run: |
           python - <<'PY'
+          import json
           import shutil
           from pathlib import Path
           from zipfile import ZIP_DEFLATED, ZipFile
@@ -226,24 +227,31 @@ jobs:
           target_root = output_root / "render_artifacts"
           shutil.rmtree(target_root, ignore_errors=True)
           target_root.mkdir(parents=True, exist_ok=True)
-
           is_batch_mode = "${{ env.RUN_MODE }}" in {"batch", "batch-both"}
           files = []
 
           if is_batch_mode:
-              log_path = output_root / "batch_render.log"
-              if log_path.exists():
+              summary_path = output_root / "batch_render_summary.json"
+              if summary_path.exists():
+                  summary = json.loads(summary_path.read_text(encoding="utf-8"))
                   seen = set()
-                  for line in log_path.read_text(encoding="utf-8").splitlines():
-                      prefix = "[배치 출력] "
-                      if not line.startswith(prefix):
+                  for result in summary.get("job_results", []):
+                      if not isinstance(result, dict) or result.get("status") != "success":
                           continue
-                      source = Path(line[len(prefix):].strip()).resolve()
+                      output_path = result.get("output_path")
+                      if not isinstance(output_path, str) or not output_path.strip():
+                          continue
+                      source = Path(output_path).resolve()
                       if str(source) in seen:
                           continue
                       if source.exists() and source.suffix.lower() == ".mp4":
                           seen.add(str(source))
                           files.append(source)
+              if not files:
+                  files = sorted(
+                      path for path in output_root.rglob("*.mp4")
+                      if "render_artifacts" not in path.parts
+                  )
           else:
               files = sorted(
                   path for path in output_root.rglob("*.mp4")

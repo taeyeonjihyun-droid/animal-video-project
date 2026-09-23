@@ -101,6 +101,23 @@ class AIImageGenerationTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 main.generate_ai_images(config_path_override=rel_config_path)
 
+    def test_validate_video_config_rejects_missing_video_source(self):
+        config_path = self.tmp_dir / "episode.json"
+        self._write_json(
+            config_path,
+            {
+                "project_title": "테스트",
+                "subtitle": "비디오 검증",
+                "video": {"width": 1080, "height": 1920, "fps": 30, "fade_seconds": 0.1},
+                "output": "output/test.mp4",
+                "scenes": [{"source": "assets/clips/missing.mp4", "caption": "첫 장면", "duration": 0.5, "zoom": 1.0}],
+            },
+        )
+
+        cfg = main.load_config_from_path(config_path)
+        with self.assertRaises(ValueError):
+            main.validate_video_config(cfg, config_path=config_path)
+
     def test_openai_compatible_image_decodes_b64_json(self):
         png_bytes = self._png_bytes(color=(0, 0, 255))
         payload = json.dumps(
