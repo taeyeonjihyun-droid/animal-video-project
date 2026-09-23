@@ -93,14 +93,10 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          summary_args=()
-          if [ "${{ github.event.inputs.batch_summary_report || 'true' }}" = "true" ]; then
-            summary_args+=(--summary-report output/batch_render_summary.json)
-          fi
           python batch.py \
             --batch-config "${{ github.event.inputs.batch_file }}" \
             --retry-failed "${{ github.event.inputs.batch_retry_count || '0' }}" \
-            "${summary_args[@]}" \
+            --summary-report output/batch_render_summary.json \
             2>&1 | tee output/batch_render.log
 
       - name: Generate batch prompts
@@ -232,26 +228,22 @@ jobs:
 
           if is_batch_mode:
               summary_path = output_root / "batch_render_summary.json"
-              if summary_path.exists():
-                  summary = json.loads(summary_path.read_text(encoding="utf-8"))
-                  seen = set()
-                  for result in summary.get("job_results", []):
-                      if not isinstance(result, dict) or result.get("status") != "success":
-                          continue
-                      output_path = result.get("output_path")
-                      if not isinstance(output_path, str) or not output_path.strip():
-                          continue
-                      source = Path(output_path).resolve()
-                      if str(source) in seen:
-                          continue
-                      if source.exists() and source.suffix.lower() == ".mp4":
-                          seen.add(str(source))
-                          files.append(source)
-              if not files:
-                  files = sorted(
-                      path for path in output_root.rglob("*.mp4")
-                      if "render_artifacts" not in path.parts
-                  )
+              if not summary_path.exists():
+                  raise SystemExit("배치 렌더 요약 파일이 없어 현재 실행의 MP4 목록을 확인할 수 없습니다.")
+              summary = json.loads(summary_path.read_text(encoding="utf-8"))
+              seen = set()
+              for result in summary.get("job_results", []):
+                  if not isinstance(result, dict) or result.get("status") != "success":
+                      continue
+                  output_path = result.get("output_path")
+                  if not isinstance(output_path, str) or not output_path.strip():
+                      continue
+                  source = Path(output_path).resolve()
+                  if str(source) in seen:
+                      continue
+                  if source.exists() and source.suffix.lower() == ".mp4":
+                      seen.add(str(source))
+                      files.append(source)
           else:
               files = sorted(
                   path for path in output_root.rglob("*.mp4")

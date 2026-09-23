@@ -242,7 +242,7 @@ python main.py --config output/generated_ai_config.json
 
 여러 개의 설정 파일을 한 번에 순차 렌더링할 수 있습니다. 기본 예시 파일은 프로젝트 루트의 `batch.json`입니다.
 
-### 7-1. `batch.json` 형식
+### 8-1. `batch.json` 형식
 
 각 job은 최소 `config`를 가져야 하며, 필요하면 `overrides.output`으로 결과 파일명을 개별 지정할 수 있습니다.
 
@@ -290,7 +290,7 @@ python main.py --config output/generated_ai_config.json
 
 여러 job이 같은 출력명을 가리키거나 이미 파일이 존재하면 `_02`, `_03`처럼 번호를 붙여 덮어쓰기를 막습니다.
 
-### 7-2. 로컬 명령
+### 8-2. 로컬 명령
 
 단일 렌더링:
 
@@ -323,7 +323,7 @@ python batch.py --batch-config batch.json --retry-failed 2
 python batch.py --batch-config batch.json --summary-report output/batch_render_summary.json
 ```
 
-### 7-3. GitHub Actions에서 배치 실행하는 정확한 순서
+### 8-3. GitHub Actions에서 배치 실행하는 정확한 순서
 
 1. `config.json`, `batch.json`, 필요한 `assets/` 파일을 **커밋/푸시**합니다.
 2. GitHub 저장소 상단에서 **Actions** 탭을 엽니다.
@@ -343,7 +343,7 @@ python batch.py --batch-config batch.json --summary-report output/batch_render_s
    - `batch-run-logs`: 배치 로그
    - `batch-execution-summary`: 배치 요약 JSON
 
-### 7-4. 일부 job이 실패할 때 동작
+### 8-4. 일부 job이 실패할 때 동작
 
 - 각 job은 독립적으로 검증·실행됩니다.
 - 한 job이 실패해도 **뒤의 job은 계속 실행**됩니다.
@@ -351,7 +351,7 @@ python batch.py --batch-config batch.json --summary-report output/batch_render_s
 - 모든 job이 끝난 뒤 하나라도 실패가 있으면 **프로세스 종료 코드는 1**이므로 로컬 명령과 GitHub Actions 모두 실패로 표시됩니다.
 - GitHub Actions에서는 실패로 끝나더라도 **성공한 MP4와 로그 아티팩트가 먼저 업로드**됩니다.
 
-### 7-5. 운영 팁
+### 8-5. 운영 팁
 
 - 원본 `config.json`, `batch.json`, 추가 설정 파일, `assets/`는 반드시 Git에 커밋해 두세요.
 - 생성된 `output/*.mp4` 파일은 용량이 크므로 **커밋하지 않는 것을 권장**합니다.
