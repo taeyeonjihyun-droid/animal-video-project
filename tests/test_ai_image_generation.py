@@ -83,6 +83,33 @@ class AIImageGenerationTests(unittest.TestCase):
         self.assertEqual(generated_cfg["scenes"][0]["source"], "generated_ai_images/scene_01.png")
         self.assertEqual(generated_cfg["scenes"][1]["source"], "generated_ai_images/scene_02.png")
 
+    def test_generate_ai_images_keeps_relative_sources_valid_for_custom_generated_config(self):
+        config_path = self.tmp_dir / "episode.json"
+        self._write_json(
+            config_path,
+            {
+                "project_title": "테스트",
+                "subtitle": "커스텀 경로",
+                "video": {"width": 1080, "height": 1920, "fps": 30, "fade_seconds": 0.1},
+                "output": "output/test.mp4",
+                "scenes": [{"source": "assets/images/one.png", "caption": "첫 장면", "duration": 0.5, "zoom": 1.0}],
+            },
+        )
+
+        rel_config_path = config_path.relative_to(main.ROOT).as_posix()
+        custom_generated_config = (self.tmp_dir / "exports" / "bundle" / "generated_config.json").relative_to(main.ROOT).as_posix()
+        with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}, clear=False):
+            with patch("main.generate_ai_image_bytes", return_value=self._png_bytes()):
+                main.generate_ai_images(
+                    config_path_override=rel_config_path,
+                    generated_config_override=custom_generated_config,
+                )
+
+        generated_config_path = self.tmp_dir / "exports" / "bundle" / "generated_config.json"
+        generated_cfg = json.loads(generated_config_path.read_text(encoding="utf-8"))
+        self.assertEqual(generated_cfg["scenes"][0]["source"], "generated_ai_images/scene_01.png")
+        self.assertTrue((self.tmp_dir / "exports" / "bundle" / "generated_ai_images" / "scene_01.png").exists())
+
     def test_generate_ai_images_requires_api_key(self):
         config_path = self.tmp_dir / "episode.json"
         self._write_json(

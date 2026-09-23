@@ -106,7 +106,7 @@ jobs:
 
       - name: Generate batch prompts
         id: batch_prompts
-        if: ${{ always() && (env.RUN_MODE == 'batch-prompts' || env.RUN_MODE == 'batch-both') }}
+        if: ${{ (env.RUN_MODE == 'batch-prompts') || (env.RUN_MODE == 'batch-both' && steps.batch_render.outcome == 'success') }}
         continue-on-error: true
         shell: bash
         run: |
@@ -243,6 +243,10 @@ jobs:
                       if not isinstance(output_path, str) or not output_path.strip():
                           continue
                       source = Path(output_path).resolve()
+                      try:
+                          source.relative_to(output_root)
+                      except ValueError:
+                          raise SystemExit(f"배치 요약의 MP4 경로가 output/ 범위를 벗어났습니다: {source}")
                       if str(source) in seen:
                           continue
                       if source.exists() and source.suffix.lower() == ".mp4":

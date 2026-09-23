@@ -676,11 +676,6 @@ def resolve_ai_image_generation_settings(
     if image_cfg is not None and not isinstance(image_cfg, dict):
         raise ValueError("image_generation 설정은 객체(dict)여야 합니다.")
 
-    images_dir_value = (
-        images_dir_override
-        if images_dir_override
-        else image_cfg.get("output_dir", "output/generated_ai_images")
-    )
     generated_config_value = (
         generated_config_override
         if generated_config_override
@@ -692,11 +687,22 @@ def resolve_ai_image_generation_settings(
         else image_cfg.get("model", DEFAULT_AI_IMAGE_MODEL)
     )
 
-    images_dir = validate_output_directory_path(images_dir_value, base_dir=Path.cwd().resolve() if images_dir_override else config_path.parent)
     generated_config_path = validate_json_output_path(
         generated_config_value,
         base_dir=Path.cwd().resolve() if generated_config_override else config_path.parent,
     )
+    if images_dir_override:
+        images_dir_value = images_dir_override
+        images_dir_base = Path.cwd().resolve()
+    else:
+        configured_images_dir = image_cfg.get("output_dir")
+        if configured_images_dir:
+            images_dir_value = configured_images_dir
+            images_dir_base = config_path.parent
+        else:
+            images_dir_value = "generated_ai_images"
+            images_dir_base = generated_config_path.parent
+    images_dir = validate_output_directory_path(images_dir_value, base_dir=images_dir_base)
     if not isinstance(model_value, str) or not model_value.strip():
         raise ValueError("이미지 생성 모델명은 비어 있지 않은 문자열이어야 합니다.")
     return images_dir, generated_config_path, model_value.strip()
