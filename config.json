@@ -25,8 +25,8 @@
   },
   "scenes": [
     {
-      "source": "assets/images/animal_friends.png",
-      "caption": "",
+      "source": "assets/images/01_riverside_reunion.png",
+      "caption": "동물 친구들이 다시 친근한 상어를 만났어요!",
       "narration": "강아지, 고양이, 판다, 토끼는 물가에서 다시 만난 상어에게 반갑게 인사해요.",
       "prompt": "Four cute animal friends standing together at a beautiful riverside, happily meeting a friendly shark rising from the clear water. The characters are: a cute golden-brown puppy, a cute gray-and-white kitten, a chubby black-and-white giant panda, and a cheerful white rabbit with pink inner ears. All four animals are smiling with excited and friendly expressions, standing close together near the water edge. A large friendly shark lifts its head above the water and smiles at them. Bright sunny sky, soft natural lighting, green riverside plants, sparkling water, warm and welcoming mood. High-quality cinematic 3D animated movie style, cute and heartwarming, colorful environment, child-safe, consistent characters, no humans, no text, no watermark, 16:9. Character consistency reference for every scene: Dog: cute golden-brown puppy, round eyes, friendly smile. Cat: cute gray-and-white kitten, round face, bright eyes. Giant Panda: chubby black-and-white panda, gentle expression. White Rabbit: cute white rabbit with pink inner ears, cheerful expression. Friendly Shark: large friendly shark, smiling, not scary. Shark Mother: slightly bigger gentle shark, warm and calm expression. Baby Shark: small cute shark, playful and adorable. Sea Turtle: friendly sea turtle, calm and gentle. Fish: many colorful fish including yellow tropical fish, blue fish, orange striped fish, purple small fish, and silver schooling fish. Keep each character's appearance, colors, proportions, and facial features identical across all scenes.",
       "negative_prompt": "low quality, blurry, dark scene, scary shark, aggressive expression, realistic horror, deformed body, extra limbs, duplicate characters, missing characters, inconsistent character design, distorted face, cropped characters, messy composition, text, subtitles, logo, watermark, humans",
