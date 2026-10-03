@@ -1,57 +1,81 @@
 {
-  "project_title": "부산으로 떠난 동물 친구들과 상어 여행",
-  "subtitle": "Busan shark trip final render with source footage, image moments and soft BGM",
+  "project_title": "",
+  "subtitle": "",
   "video": {
     "width": 1280,
     "height": 720,
     "fps": 30,
     "fade_seconds": 0.4,
-    "crossfade_seconds": 0.4,
-    "bgm_volume": 0.12
+    "crossfade_seconds": 0.0,
+    "bgm_volume": 0.35
   },
   "bgm": "assets/audio/bgm.mp3",
-  "output": "output/busan_shark_trip_final.mp4",
-  "image_prompt_output": "output/scene_image_prompts.json",
+  "output": "output/shark_family_underwater_adventure.mp4",
+  "image_prompt_output": "output/shark_family_underwater_adventure_prompts.json",
   "scenes": [
     {
-      "source": "assets/video/busan_shark_trip_source.mp4",
-      "caption": "동물 친구들이 부산 바다 여행을 시작해요!",
-      "start": 0.0,
-      "duration": 3.8,
-      "zoom": 1.0
-    },
-    {
       "source": "assets/images/animal_friends.png",
-      "caption": "부산에 도착한 동물 친구들이 설레는 마음으로 함께 모였어요!",
-      "duration": 4.6,
-      "zoom": 1.07
-    },
-    {
-      "source": "assets/video/busan_shark_trip_source.mp4",
-      "caption": "부산 풍경을 따라 신나게 이동하며 여행 분위기를 즐겨요!",
-      "start": 3.4,
+      "caption": "",
+      "narration": "강아지, 고양이, 판다, 토끼는 물가에서 다시 만난 상어에게 반갑게 인사해요.",
+      "prompt": "강가에서 강아지, 고양이, 자이언트 판다, 흰 토끼가 나란히 서서 전에 만났던 친근한 큰 상어에게 환하게 인사한다. 상어는 물 위로 얼굴을 내밀고 미소 짓는다. 동물 친구들은 놀라거나 무서워하지 않고 반가워���다. 밝고 따뜻한 햇살, 고품질 시네마틱 3D 애니메이션, 부드러운 자연광, 아동 친화적, 캐릭터 외형 일관성 유지, 사람·글자·자막·로고·워터마크 없음.",
       "duration": 8.0,
-      "zoom": 1.0
-    },
-    {
-      "source": "assets/video/busan_shark_trip_source.mp4",
-      "caption": "드넓은 물가에서 상어가 나타나길 기다려요!",
-      "start": 11.4,
-      "duration": 4.8,
-      "zoom": 1.0
-    },
-    {
-      "source": "assets/images/busan_shark.png",
-      "caption": "마침내 부산 바다에서 상어를 또렷하게 발견했어요!",
-      "duration": 5.4,
       "zoom": 1.05
     },
     {
-      "source": "assets/video/busan_shark_trip_source.mp4",
-      "caption": "상어를 본 뒤에도 부산 여행의 여운을 즐기며 마무리해요!",
-      "start": 18.2,
-      "duration": 8.6,
-      "zoom": 1.0
+      "source": "assets/images/busan_shark.png",
+      "caption": "",
+      "narration": "친근한 상어는 친구들을 아름다운 바닷속 세계로 초대해요.",
+      "prompt": "친근한 큰 상어가 강아지, 고양이, 자이언트 판다, 흰 토끼를 바닷속으로 초대하듯 천천히 앞장서 헤엄친다. 동물 친구들은 기대에 찬 표정으로 상어를 따라간다. 물 위에 반짝이는 빛과 투명한 거품 길이 나타나며 모험이 시작된다. 따뜻하고 마법 같은 분위기, 고품질 시네마틱 3D 애니메이션, 캐릭터 외형 일관성 유지, 사람·글자·자막·로고·워터마크 없음.",
+      "duration": 8.0,
+      "zoom": 1.05
+    },
+    {
+      "source": "assets/images/animal_friends.png",
+      "caption": "",
+      "narration": "맑고 푸른 물속으로 들어가자 산호초와 햇살, 작은 물고기들이 펼쳐져요.",
+      "prompt": "강아지, 고양이, 자이언트 판다, 흰 토끼가 맑고 푸른 바닷속에 도착해 놀라움과 기쁨을 표현한다. 햇살이 물속으로 부드럽게 쏟아지고, 알록달록한 산호초와 흔들리는 해초, 작은 물고기들이 주변을 채운다. 아름답고 평화로운 바닷속 세계, 고품질 시네마틱 3D 애니메이션, 캐릭터 외형 일관성 유지, 사람·글자·자막·로고·워터마크 없음.",
+      "duration": 8.0,
+      "zoom": 1.04
+    },
+    {
+      "source": "assets/images/busan_shark.png",
+      "caption": "",
+      "narration": "상어엄마와 귀여운 아기상어가 나타나 새로운 친구들에게 인사해요.",
+      "prompt": "바닷속 산호초 앞에서 친근한 큰 상어가 부드럽고 든든한 상어엄마와 작고 귀여운 아기상어를 네 동물 친구에게 소개한다. 아기상어는 꼬리를 살랑살랑 흔들며 밝게 인사하고 모두 미소 짓는다. 따뜻한 표정, 다채로운 물고기, 고품질 시네마틱 3D 애니메이션, 캐릭터 외형 일관성 유지, 사람·글자·자막·로고·워터마크 없음.",
+      "duration": 8.0,
+      "zoom": 1.06
+    },
+    {
+      "source": "assets/images/animal_friends.png",
+      "caption": "",
+      "narration": "노란색, 파란색, 주황색, 보라색 물고기와 은빛 물고기 떼가 모두를 환영해요.",
+      "prompt": "노란 열대어, 파란 열대어, 주황색 흰줄 물고기, 보라색 작은 물고기와 반짝이는 은빛 물고기 떼가 동물 친구들과 상어 가족 주위를 즐겁게 헤엄치며 환영한다. 생동감 있고 평화로운 산호초, 선명하고 따뜻한 색감, 고품질 시네마틱 3D 애니메이션, 캐릭터 외형 일관성 유지, 사람·글자·자막·로고·워터마크 없음.",
+      "duration": 8.0,
+      "zoom": 1.05
+    },
+    {
+      "source": "assets/images/river_walk.png",
+      "caption": "",
+      "narration": "친근한 바다거북이 아름다운 산호초 길을 천천히 안내해 줘요.",
+      "prompt": "친근한 바다거북이 강아지, 고양이, 자이언트 판다, 흰 토끼와 상어 가족을 아름다운 산호초 길로 안내한다. 모두가 안전하고 편안하게 함께 여행하며 다양한 작은 물고기가 곁을 헤엄친다. 부드러운 햇살 줄기와 흔들리는 해초, 평온하고 신나는 모험, 고품질 시네마틱 3D 애니메이션, 캐릭터 외형 일관성 유지, 사람·글자·자막·로고·워터마크 없음.",
+      "duration": 8.0,
+      "zoom": 1.05
+    },
+    {
+      "source": "assets/images/animal_friends.png",
+      "caption": "",
+      "narration": "동물 친구들과 상어 가족은 함께 바닷속을 구경하며 행복한 시간을 보내요.",
+      "prompt": "강아지, 고양이, 자이언트 판다, 흰 토끼가 친근한 큰 상어, 상어엄마, 아기상어, 바다거북과 함께 바닷속을 즐겁게 구경한다. 물고기들이 주위를 헤엄치고 모두 호기심과 행복을 나눈다. 평화롭고 따뜻한 가족 모험, 고품질 시네마틱 3D 애니메이션, 캐릭터 외형 일관성 유지, 사람·글자·자막·로고·워터마크 없음.",
+      "duration": 8.0,
+      "zoom": 1.05
+    },
+    {
+      "source": "assets/images/busan_shark.png",
+      "caption": "",
+      "narration": "모두 함께 밝게 인사하며 다음 바닷속 모험을 기대해요.",
+      "prompt": "강아지, 고양이, 자이언트 판다, 흰 토끼와 친근한 상어 가족, 바다거북, 알록달록한 물고기들이 한자리에 모여 카메라를 향해 밝게 인사한다. 아기상어가 꼬리를 흔들고 모두 다음 바닷속 모험을 기대하며 미소 짓는다. 따뜻하고 희망찬 마무리, 부드러운 햇살, 고품질 시네마틱 3D 애니메이션, 캐릭터 외형 일관성 유지, 사람·글자·자막·로고·워터마크 없음.",
+      "duration": 8.0,
+      "zoom": 1.04
     }
   ]
 }
